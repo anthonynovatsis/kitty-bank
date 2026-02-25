@@ -8,5 +8,5 @@ export default {
   dbCredentials: {
     url: env.DATABASE_URL,
   },
-  tablesFilter: ["vale-bank_*"],
+  tablesFilter: ["kittybank_*"],
 } satisfies Config;
