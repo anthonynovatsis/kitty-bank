@@ -1,12 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { authClient } from "~/server/better-auth/client";
 
 export default function SignUp() {
   const router = useRouter();
+  const [checkingAuth, setCheckingAuth] = useState(true);
+
+  useEffect(() => {
+    // Check if user is already logged in
+    void authClient.getSession().then((session) => {
+      if (session.data) {
+        router.push("/dashboard");
+      } else {
+        setCheckingAuth(false);
+      }
+    });
+  }, [router]);
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -58,6 +71,14 @@ export default function SignUp() {
       setLoading(false);
     }
   };
+
+  if (checkingAuth) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-lg">Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen flex-col justify-center bg-gray-50 py-12 sm:px-6 lg:px-8">
