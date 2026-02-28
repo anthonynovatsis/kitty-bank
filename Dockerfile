@@ -33,20 +33,31 @@ RUN corepack enable && corepack prepare pnpm@10.2.0 --activate
 
 WORKDIR /app
 
-# Create a non-root user
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nextjs -u 1001
 
 # Copy necessary files from builder
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/pnpm-lock.yaml ./pnpm-lock.yaml
 
-# Install only production dependencies
-RUN pnpm install --prod --frozen-lockfile
+# Install production dependencies AND drizzle-kit for migrations
+RUN pnpm install --prod --frozen-lockfile && \
+    pnpm add -D drizzle-kit
 
 # Copy built application
 COPY --from=builder /app/.next ./.next
+
+# Copy Drizzle schema and config files for migrations
+COPY --from=builder /app/src/server/db/schema.ts ./src/server/db/schema.ts
+COPY --from=builder /app/drizzle.config.ts ./drizzle.config.ts
+COPY --from=builder /app/src/env.js ./src/env.js
+COPY --from=builder /app/tsconfig.json ./tsconfig.json
+
+# Copy and set permissions for entrypoint script
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+# Create data directory for SQLite
+RUN mkdir -p /app/data
 
 # Expose port
 EXPOSE 3000
@@ -55,5 +66,5 @@ EXPOSE 3000
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Start the application
-CMD ["pnpm", "start"]
+# Use entrypoint script to initialize database and start app
+ENTRYPOINT ["/app/entrypoint.sh"]
