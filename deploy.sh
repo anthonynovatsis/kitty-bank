@@ -3,7 +3,7 @@ set -e
 set -o pipefail
 
 REMOTE_USER="marty"
-REMOTE_HOST="almanac"
+REMOTE_HOST="almanac.home"
 REMOTE_DIR="/volume1/docker/kittybank"
 IMAGE="kitty-bank"
 TARBALL="${IMAGE}-amd64.tar.gz"
@@ -29,4 +29,3 @@ ssh -t "${REMOTE_USER}@${REMOTE_HOST}" "cd ${REMOTE_DIR} && \
   sudo /usr/local/bin/docker-compose logs --tail=50"
 
 echo "✅ Deployment complete!"
-echo "🌐 Access at: http://almanac:3000"
