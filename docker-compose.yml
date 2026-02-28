@@ -16,10 +16,6 @@ services:
       # Better Auth Secret (generate a secure random string)
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
 
-      # GitHub OAuth (optional - remove if not using)
-      - BETTER_AUTH_GITHUB_CLIENT_ID=${BETTER_AUTH_GITHUB_CLIENT_ID}
-      - BETTER_AUTH_GITHUB_CLIENT_SECRET=${BETTER_AUTH_GITHUB_CLIENT_SECRET}
-
     volumes:
       # Persist SQLite database
       - ./data:/app/data
