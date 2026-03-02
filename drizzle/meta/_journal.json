@@ -1,0 +1,12 @@
+{
+  "version": "7",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1772456037000,
+      "tag": "0000_initial_schema",
+      "breakpoints": true
+    }
+  ]
+}
