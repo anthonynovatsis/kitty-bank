@@ -8,5 +8,5 @@ export default {
   dbCredentials: {
     url: env.DATABASE_URL,
   },
-  tablesFilter: ["kittybank_*"],
+  casing: "snake_case",
 } satisfies Config;

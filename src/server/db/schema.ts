@@ -2,7 +2,7 @@ import { relations, sql } from "drizzle-orm";
 import { index, sqliteTable } from "drizzle-orm/sqlite-core";
 
 // Better Auth core tables
-export const user = sqliteTable("user", (d) => ({
+export const users = sqliteTable("users", (d) => ({
   id: d
     .text({ length: 255 })
     .notNull()
@@ -19,13 +19,13 @@ export const user = sqliteTable("user", (d) => ({
   updatedAt: d.integer({ mode: "timestamp" }).$onUpdate(() => new Date()),
 }));
 
-export const userRelations = relations(user, ({ many }) => ({
-  account: many(account),
-  session: many(session),
+export const userRelations = relations(users, ({ many }) => ({
+  account: many(accounts),
+  session: many(sessions),
 }));
 
-export const account = sqliteTable(
-  "account",
+export const accounts = sqliteTable(
+  "accounts",
   (d) => ({
     id: d
       .text({ length: 255 })
@@ -35,7 +35,7 @@ export const account = sqliteTable(
     userId: d
       .text({ length: 255 })
       .notNull()
-      .references(() => user.id),
+      .references(() => users.id),
     accountId: d.text({ length: 255 }).notNull(),
     providerId: d.text({ length: 255 }).notNull(),
     accessToken: d.text(),
@@ -51,15 +51,15 @@ export const account = sqliteTable(
       .notNull(),
     updatedAt: d.integer({ mode: "timestamp" }).$onUpdate(() => new Date()),
   }),
-  (t) => [index("account_user_id_idx").on(t.userId)],
+  (t) => [index("accounts_user_id_idx").on(t.userId)],
 );
 
-export const accountRelations = relations(account, ({ one }) => ({
-  user: one(user, { fields: [account.userId], references: [user.id] }),
+export const accountRelations = relations(accounts, ({ one }) => ({
+  user: one(users, { fields: [accounts.userId], references: [users.id] }),
 }));
 
-export const session = sqliteTable(
-  "session",
+export const sessions = sqliteTable(
+  "sessions",
   (d) => ({
     id: d
       .text({ length: 255 })
@@ -69,7 +69,7 @@ export const session = sqliteTable(
     userId: d
       .text({ length: 255 })
       .notNull()
-      .references(() => user.id),
+      .references(() => users.id),
     token: d.text({ length: 255 }).notNull().unique(),
     expiresAt: d.integer({ mode: "timestamp" }).notNull(),
     ipAddress: d.text({ length: 255 }),
@@ -80,15 +80,15 @@ export const session = sqliteTable(
       .notNull(),
     updatedAt: d.integer({ mode: "timestamp" }).$onUpdate(() => new Date()),
   }),
-  (t) => [index("session_user_id_idx").on(t.userId)],
+  (t) => [index("sessions_user_id_idx").on(t.userId)],
 );
 
-export const sessionRelations = relations(session, ({ one }) => ({
-  user: one(user, { fields: [session.userId], references: [user.id] }),
+export const sessionRelations = relations(sessions, ({ one }) => ({
+  user: one(users, { fields: [sessions.userId], references: [users.id] }),
 }));
 
-export const verification = sqliteTable(
-  "verification",
+export const verifications = sqliteTable(
+  "verifications",
   (d) => ({
     id: d
       .text({ length: 255 })
@@ -104,5 +104,5 @@ export const verification = sqliteTable(
       .notNull(),
     updatedAt: d.integer({ mode: "timestamp" }).$onUpdate(() => new Date()),
   }),
-  (t) => [index("verification_identifier_idx").on(t.identifier)],
+  (t) => [index("verifications_identifier_idx").on(t.identifier)],
 );
