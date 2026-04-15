@@ -13,6 +13,8 @@ import { ZodError } from "zod";
 
 import { auth } from "~/server/better-auth";
 import { db } from "~/server/db";
+import { userSettings } from "~/server/db/schema";
+import { eq } from "drizzle-orm";
 
 /**
  * 1. CONTEXT
@@ -129,6 +131,40 @@ export const protectedProcedure = t.procedure
       ctx: {
         // infers the `session` as non-nullable
         session: { ...ctx.session, user: ctx.session.user },
+      },
+    });
+  });
+
+/**
+ * Admin (authenticated + admin) procedure
+ *
+ * If you want a query or mutation to ONLY be accessible to admin users, use this. It verifies
+ * the session is valid AND the user has admin permissions in user_settings.
+ */
+export const adminProcedure = t.procedure
+  .use(timingMiddleware)
+  .use(async ({ ctx, next }) => {
+    if (!ctx.session?.user) {
+      throw new TRPCError({ code: "UNAUTHORIZED" });
+    }
+
+    // Check if user has admin permissions
+    const settings = await ctx.db.query.userSettings.findFirst({
+      where: eq(userSettings.userId, ctx.session.user.id),
+    });
+
+    if (!settings?.isAdmin) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Admin access required",
+      });
+    }
+
+    return next({
+      ctx: {
+        // infers the `session` as non-nullable and adds admin context
+        session: { ...ctx.session, user: ctx.session.user },
+        adminUser: ctx.session.user,
       },
     });
   });
