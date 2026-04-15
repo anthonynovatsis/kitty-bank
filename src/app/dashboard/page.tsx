@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { getSession } from "~/server/better-auth/server";
 import { auth } from "~/server/better-auth";
+import { DashboardContent } from "./components/DashboardContent";
 
 export default async function Dashboard() {
   const session = await getSession();
@@ -43,22 +44,7 @@ export default async function Dashboard() {
 
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="py-8">
-          <div className="rounded-lg bg-white p-6 shadow">
-            <h2 className="mb-4 text-2xl font-bold text-gray-900">
-              Your Balance
-            </h2>
-            <p className="text-4xl font-bold text-green-600">$0.00</p>
-            <p className="mt-2 text-sm text-gray-500">
-              Banking features coming soon...
-            </p>
-          </div>
-
-          <div className="mt-8 rounded-lg bg-white p-6 shadow">
-            <h3 className="mb-4 text-lg font-medium text-gray-900">
-              Recent Transactions
-            </h3>
-            <p className="text-gray-500">No transactions yet</p>
-          </div>
+          <DashboardContent />
         </div>
       </main>
     </div>
