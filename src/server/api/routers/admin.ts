@@ -1,10 +1,33 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { eq, and } from "drizzle-orm";
+import { eq, and, like } from "drizzle-orm";
 import { createTRPCRouter, adminProcedure } from "~/server/api/trpc";
 import { cashAccounts, investmentAccounts, users } from "~/server/db/schema";
 
 export const adminRouter = createTRPCRouter({
+  // Search users for account creation
+  users: createTRPCRouter({
+    search: adminProcedure
+      .input(
+        z.object({
+          query: z.string().min(1),
+        }),
+      )
+      .query(async ({ ctx, input }) => {
+        const searchResults = await ctx.db.query.users.findMany({
+          where: and(like(users.name, `%${input.query}%`)),
+          columns: {
+            id: true,
+            name: true,
+            email: true,
+          },
+          limit: 10,
+        });
+
+        return searchResults;
+      }),
+  }),
+
   accounts: createTRPCRouter({
     // Create a new account for a user
     create: adminProcedure
