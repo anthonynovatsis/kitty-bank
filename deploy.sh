@@ -4,7 +4,7 @@ set -o pipefail
 
 REMOTE_USER="marty"
 REMOTE_HOST="almanac.home"
-REMOTE_DIR="/volume1/docker/kittybank"
+REMOTE_DIR="/volume2/docker/kittybank"
 IMAGE="kitty-bank"
 TARBALL="${IMAGE}-amd64.tar.gz"
 
