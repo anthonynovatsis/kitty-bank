@@ -17,6 +17,7 @@
     "lint": "next lint",
     "lint:fix": "next lint --fix",
     "modify-user": "tsx --env-file=.env scripts/modify-user.ts",
+    "reset-password": "tsx --env-file=.env scripts/reset-password.ts",
     "preview": "next build && next start",
     "start": "next start",
     "test": "vitest run",
