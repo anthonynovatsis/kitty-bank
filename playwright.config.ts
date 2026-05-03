@@ -36,7 +36,7 @@ export default defineConfig({
   webServer: {
     command: "pnpm db:migrate && pnpm exec next dev --port 3001",
     url: "http://localhost:3001",
-    reuseExistingServer: false,
+    reuseExistingServer: !process.env.CI,
     env: {
       DATABASE_URL: "file:./test.db",
       SKIP_ENV_VALIDATION: "true",
