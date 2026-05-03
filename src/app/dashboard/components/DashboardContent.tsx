@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { api } from "~/trpc/react";
 
 export function DashboardContent() {
@@ -52,7 +53,11 @@ export function DashboardContent() {
       <div className="mt-8 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {/* Cash Accounts */}
         {accounts?.cashAccounts.map((account) => (
-          <div key={account.id} className="rounded-lg bg-white p-6 shadow">
+          <Link
+            key={account.id}
+            href={`/dashboard/accounts/${account.id}`}
+            className="block rounded-lg bg-white p-6 shadow transition-shadow hover:shadow-md"
+          >
             <div className="flex items-center justify-between">
               <h3 className="font-medium text-gray-900">
                 {account.accountName}
@@ -67,12 +72,16 @@ export function DashboardContent() {
             <p className="text-sm text-gray-500">
               Account: {account.accountNumber}
             </p>
-          </div>
+          </Link>
         ))}
 
         {/* Investment Accounts */}
         {accounts?.investmentAccounts.map((account) => (
-          <div key={account.id} className="rounded-lg bg-white p-6 shadow">
+          <Link
+            key={account.id}
+            href={`/dashboard/accounts/${account.id}`}
+            className="block rounded-lg bg-white p-6 shadow transition-shadow hover:shadow-md"
+          >
             <div className="flex items-center justify-between">
               <h3 className="font-medium text-gray-900">
                 {account.accountName}
@@ -87,7 +96,7 @@ export function DashboardContent() {
             <p className="text-sm text-gray-500">
               {account.holdingsCount} holdings • {account.accountNumber}
             </p>
-          </div>
+          </Link>
         ))}
 
         {/* No Accounts Message */}

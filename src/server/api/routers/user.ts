@@ -1,4 +1,6 @@
 import { eq } from "drizzle-orm";
+import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { cashAccounts, investmentAccounts } from "~/server/db/schema";
 
@@ -45,5 +47,51 @@ export const userRouter = createTRPCRouter({
         })),
       };
     }),
+
+    // Get details for a single account (cash or investment)
+    getDetails: protectedProcedure
+      .input(z.object({ accountId: z.string() }))
+      .query(async ({ ctx, input }) => {
+        const userId = ctx.session.user.id;
+
+        // Try cash account first
+        const cashAccount = await ctx.db.query.cashAccounts.findFirst({
+          where: eq(cashAccounts.id, input.accountId),
+        });
+
+        if (cashAccount) {
+          if (cashAccount.userId !== userId) {
+            throw new TRPCError({ code: "FORBIDDEN" });
+          }
+          return { type: "cash" as const, account: cashAccount };
+        }
+
+        // Try investment account
+        const investmentAccount =
+          await ctx.db.query.investmentAccounts.findFirst({
+            where: eq(investmentAccounts.id, input.accountId),
+            with: {
+              holdings: true,
+            },
+          });
+
+        if (investmentAccount) {
+          if (investmentAccount.userId !== userId) {
+            throw new TRPCError({ code: "FORBIDDEN" });
+          }
+          return {
+            type: "investment" as const,
+            account: {
+              ...investmentAccount,
+              totalValue: investmentAccount.holdings.reduce(
+                (sum, h) => sum + h.quantity * h.averageCostBasis,
+                0,
+              ),
+            },
+          };
+        }
+
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }),
   }),
 });
