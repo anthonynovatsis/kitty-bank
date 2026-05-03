@@ -14,6 +14,14 @@ export function AdminDashboard() {
     refetch: refetchAccounts,
   } = api.admin.accounts.list.useQuery({});
 
+  const { data: usersData, isLoading: usersLoading, refetch: refetchUsers } =
+    api.admin.users.list.useQuery();
+
+  const updateApprovalSettings =
+    api.admin.users.updateApprovalSettings.useMutation({
+      onSuccess: () => void refetchUsers(),
+    });
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
@@ -26,7 +34,7 @@ export function AdminDashboard() {
     setShowCreateDialog(false);
   };
 
-  if (accountsLoading) {
+  if (accountsLoading || usersLoading) {
     return (
       <div className="container mx-auto p-6">
         <div className="text-center">Loading...</div>
@@ -52,7 +60,7 @@ export function AdminDashboard() {
       <div className="mb-6">
         <div className="border-b border-gray-200">
           <nav className="-mb-px flex space-x-8">
-            {["overview", "cash", "investment"].map((tab) => (
+            {["overview", "cash", "investment", "users"].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -281,6 +289,109 @@ export function AdminDashboard() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Users Tab */}
+      {activeTab === "users" && (
+        <div className="rounded-lg bg-white p-6 shadow">
+          <h3 className="mb-4 text-lg font-medium">User Management</h3>
+          {!usersData || usersData.length === 0 ? (
+            <p className="text-gray-500">No users found</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-gray-500">
+                    <th className="pb-3 pr-4 font-medium">User</th>
+                    <th className="pb-3 pr-4 font-medium">Cash Accounts</th>
+                    <th className="pb-3 pr-4 font-medium">
+                      Investment Accounts
+                    </th>
+                    <th className="pb-3 pr-4 font-medium">Total Cash Balance</th>
+                    <th className="pb-3 pr-4 font-medium">Role</th>
+                    <th className="pb-3 font-medium">Requires Approval</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {usersData.map((user) => (
+                    <tr key={user.id} className="py-3">
+                      <td className="py-3 pr-4">
+                        <p className="font-medium">{user.name ?? "—"}</p>
+                        <p className="text-xs text-gray-500">{user.email}</p>
+                      </td>
+                      <td className="py-3 pr-4">
+                        <span>{user.activeCashAccountCount} active</span>
+                        {user.cashAccountCount > user.activeCashAccountCount && (
+                          <span className="ml-1 text-gray-400">
+                            ({user.cashAccountCount} total)
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3 pr-4">
+                        <span>{user.activeInvestmentAccountCount} active</span>
+                        {user.investmentAccountCount >
+                          user.activeInvestmentAccountCount && (
+                          <span className="ml-1 text-gray-400">
+                            ({user.investmentAccountCount} total)
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3 pr-4">
+                        {formatCurrency(user.totalCashBalance)}
+                      </td>
+                      <td className="py-3 pr-4">
+                        <span
+                          className={`inline-block rounded-full px-2 py-1 text-xs ${
+                            user.isAdmin
+                              ? "bg-purple-100 text-purple-800"
+                              : "bg-gray-100 text-gray-600"
+                          }`}
+                        >
+                          {user.isAdmin ? "Admin" : "User"}
+                        </span>
+                      </td>
+                      <td className="py-3">
+                        <label className="flex cursor-pointer items-center gap-2">
+                          <div
+                            onClick={() => {
+                              if (
+                                updateApprovalSettings.isPending &&
+                                updateApprovalSettings.variables?.userId ===
+                                  user.id
+                              )
+                                return;
+                              updateApprovalSettings.mutate({
+                                userId: user.id,
+                                requiresTransactionApproval:
+                                  !user.requiresTransactionApproval,
+                              });
+                            }}
+                            className={`relative h-5 w-9 rounded-full transition-colors ${
+                              user.requiresTransactionApproval
+                                ? "bg-blue-600"
+                                : "bg-gray-300"
+                            } cursor-pointer`}
+                          >
+                            <span
+                              className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${
+                                user.requiresTransactionApproval
+                                  ? "left-4"
+                                  : "left-0.5"
+                              }`}
+                            />
+                          </div>
+                          <span className="text-xs text-gray-600">
+                            {user.requiresTransactionApproval ? "Yes" : "No"}
+                          </span>
+                        </label>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
