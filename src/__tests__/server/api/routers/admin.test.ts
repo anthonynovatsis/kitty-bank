@@ -1,7 +1,7 @@
 import { describe, it, expect, assert, beforeAll } from "vitest";
 import { TRPCError } from "@trpc/server";
 import { eq } from "drizzle-orm";
-import { cashAccounts } from "~/server/db/schema";
+import { cashAccounts, userSettings } from "~/server/db/schema";
 import { createTestDb } from "../../../helpers/db";
 import {
   insertAdminUser,
@@ -355,5 +355,192 @@ describe("admin.users.search", () => {
       caller.admin.users.search({ query: "" }),
       "BAD_REQUEST",
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// admin.users.list
+// ---------------------------------------------------------------------------
+
+describe("admin.users.list", () => {
+  const { db, migrate } = createTestDb();
+  let admin: FakeUser;
+  let user1: FakeUser;
+  let user2: FakeUser;
+
+  beforeAll(async () => {
+    await migrate();
+    admin = await insertAdminUser(db);
+    user1 = await insertUser(db);
+    user2 = await insertUser(db);
+
+    const caller = createTestCaller(db, makeSession(admin));
+
+    // user1: 1 active checking + 1 investment account
+    await caller.admin.accounts.create({
+      userId: user1.id,
+      accountType: "cash",
+      accountName: "Checking",
+      cashAccountType: "checking",
+    });
+    await caller.admin.accounts.create({
+      userId: user1.id,
+      accountType: "investment",
+      accountName: "Portfolio",
+    });
+
+    // user2: 1 savings account (closed)
+    const { account } = await caller.admin.accounts.create({
+      userId: user2.id,
+      accountType: "cash",
+      accountName: "Savings",
+      cashAccountType: "savings",
+    });
+    assert(account, "account should be defined");
+    await db
+      .update(cashAccounts)
+      .set({ status: "closed" })
+      .where(eq(cashAccounts.id, account.id));
+  });
+
+  it("throws UNAUTHORIZED when unauthenticated", async () => {
+    const caller = createTestCaller(db, null);
+    await expectTRPCError(caller.admin.users.list(), "UNAUTHORIZED");
+  });
+
+  it("throws FORBIDDEN when called by a non-admin", async () => {
+    const caller = createTestCaller(db, makeSession(user1));
+    await expectTRPCError(caller.admin.users.list(), "FORBIDDEN");
+  });
+
+  it("returns all users", async () => {
+    const caller = createTestCaller(db, makeSession(admin));
+    const result = await caller.admin.users.list();
+    // admin + user1 + user2
+    expect(result.length).toBe(3);
+  });
+
+  it("includes account counts and total cash balance", async () => {
+    const caller = createTestCaller(db, makeSession(admin));
+    const result = await caller.admin.users.list();
+    const u1 = result.find((u) => u.id === user1.id)!;
+
+    expect(u1.cashAccountCount).toBe(1);
+    expect(u1.activeCashAccountCount).toBe(1);
+    expect(u1.investmentAccountCount).toBe(1);
+    expect(u1.activeInvestmentAccountCount).toBe(1);
+    expect(u1.totalCashBalance).toBe(0);
+  });
+
+  it("correctly counts closed accounts separately from active", async () => {
+    const caller = createTestCaller(db, makeSession(admin));
+    const result = await caller.admin.users.list();
+    const u2 = result.find((u) => u.id === user2.id)!;
+
+    expect(u2.cashAccountCount).toBe(1);
+    expect(u2.activeCashAccountCount).toBe(0);
+  });
+
+  it("reflects isAdmin and requiresTransactionApproval from settings", async () => {
+    const caller = createTestCaller(db, makeSession(admin));
+    const result = await caller.admin.users.list();
+
+    const adminEntry = result.find((u) => u.id === admin.id)!;
+    expect(adminEntry.isAdmin).toBe(true);
+    expect(adminEntry.requiresTransactionApproval).toBe(false);
+
+    const u1Entry = result.find((u) => u.id === user1.id)!;
+    expect(u1Entry.isAdmin).toBe(false);
+    // user1 has no userSettings row → defaults to true
+    expect(u1Entry.requiresTransactionApproval).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// admin.users.updateApprovalSettings
+// ---------------------------------------------------------------------------
+
+describe("admin.users.updateApprovalSettings", () => {
+  const { db, migrate } = createTestDb();
+  let admin: FakeUser;
+  let user1: FakeUser;
+
+  beforeAll(async () => {
+    await migrate();
+    admin = await insertAdminUser(db);
+    user1 = await insertUser(db);
+  });
+
+  it("throws UNAUTHORIZED when unauthenticated", async () => {
+    const caller = createTestCaller(db, null);
+    await expectTRPCError(
+      caller.admin.users.updateApprovalSettings({
+        userId: user1.id,
+        requiresTransactionApproval: false,
+      }),
+      "UNAUTHORIZED",
+    );
+  });
+
+  it("throws FORBIDDEN when called by a non-admin", async () => {
+    const caller = createTestCaller(db, makeSession(user1));
+    await expectTRPCError(
+      caller.admin.users.updateApprovalSettings({
+        userId: user1.id,
+        requiresTransactionApproval: false,
+      }),
+      "FORBIDDEN",
+    );
+  });
+
+  it("throws NOT_FOUND for a non-existent user", async () => {
+    const caller = createTestCaller(db, makeSession(admin));
+    await expectTRPCError(
+      caller.admin.users.updateApprovalSettings({
+        userId: "does-not-exist",
+        requiresTransactionApproval: false,
+      }),
+      "NOT_FOUND",
+    );
+  });
+
+  it("creates settings row when none exists and sets requiresTransactionApproval", async () => {
+    const caller = createTestCaller(db, makeSession(admin));
+    await caller.admin.users.updateApprovalSettings({
+      userId: user1.id,
+      requiresTransactionApproval: false,
+    });
+
+    const settings = await db.query.userSettings.findFirst({
+      where: eq(userSettings.userId, user1.id),
+    });
+    expect(settings?.requiresTransactionApproval).toBe(false);
+  });
+
+  it("updates an existing settings row", async () => {
+    const caller = createTestCaller(db, makeSession(admin));
+
+    await caller.admin.users.updateApprovalSettings({
+      userId: user1.id,
+      requiresTransactionApproval: true,
+    });
+    const updated = await db.query.userSettings.findFirst({
+      where: eq(userSettings.userId, user1.id),
+    });
+    expect(updated?.requiresTransactionApproval).toBe(true);
+  });
+
+  it("does not change isAdmin when updating approval settings", async () => {
+    // admin already has isAdmin=true
+    const caller = createTestCaller(db, makeSession(admin));
+    await caller.admin.users.updateApprovalSettings({
+      userId: admin.id,
+      requiresTransactionApproval: true,
+    });
+
+    const settings = await db.query.userSettings.findFirst({
+      where: eq(userSettings.userId, admin.id),
+    });
+    expect(settings?.isAdmin).toBe(true);
   });
 });
