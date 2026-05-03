@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, assert, beforeAll } from "vitest";
 import { TRPCError } from "@trpc/server";
 import { holdings } from "~/server/db/schema";
 import { createTestDb } from "../../../helpers/db";
@@ -192,6 +192,7 @@ describe("user.accounts.getDetails", () => {
       accountId: cashAccountId,
     });
     expect(result.type).toBe("cash");
+    assert(result.type === "cash");
     expect(result.account.id).toBe(cashAccountId);
     expect(result.account.accountName).toBe("My Checking");
     expect(result.account.balance).toBe(0);
@@ -212,6 +213,7 @@ describe("user.accounts.getDetails", () => {
       accountId: investmentAccountId,
     });
     expect(result.type).toBe("investment");
+    assert(result.type === "investment");
     expect(result.account.id).toBe(investmentAccountId);
     // 10 * 200 = 2000
     expect(result.account.totalValue).toBe(2000);
@@ -255,6 +257,7 @@ describe("user.accounts.getDetails", () => {
       accountId: account!.id,
     });
     expect(result.type).toBe("investment");
+    assert(result.type === "investment");
     expect(result.account.totalValue).toBe(0);
     expect(result.account.holdings).toHaveLength(0);
   });
