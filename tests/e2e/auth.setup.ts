@@ -1,4 +1,4 @@
-import { test } from "@playwright/test";
+import { test, type Page } from "@playwright/test";
 import { ADMIN_AUTH_FILE, USER_AUTH_FILE } from "../../playwright.config";
 import { ADMIN, USER } from "./credentials";
 
@@ -6,10 +6,7 @@ type Credentials = { name: string; email: string; password: string };
 
 // Try to sign in; if that fails (no account yet), sign up instead.
 // This makes the setup idempotent so re-runs in UI mode work correctly.
-async function ensureSession(
-  page: Parameters<Parameters<typeof test>[1]>[0],
-  credentials: Credentials,
-) {
+async function ensureSession(page: Page, credentials: Credentials) {
   await page.goto("/signin");
   await page.waitForSelector("#email");
   await page.fill("#email", credentials.email);
@@ -17,10 +14,13 @@ async function ensureSession(
   await page.click('button[type="submit"]');
 
   // If sign-in succeeds we land on /dashboard — done.
-  const landed = await page
-    .waitForURL("**/dashboard", { timeout: 5000 })
-    .then(() => true)
-    .catch(() => false);
+  let landed = false;
+  try {
+    await page.waitForURL("**/dashboard", { timeout: 5000 });
+    landed = true;
+  } catch {
+    // Sign-in failed — account doesn't exist yet, fall through to sign up.
+  }
 
   if (!landed) {
     // Account doesn't exist yet — sign up.

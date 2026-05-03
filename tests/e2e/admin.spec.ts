@@ -1,12 +1,9 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { ADMIN_AUTH_FILE, USER_AUTH_FILE } from "../../playwright.config";
-import { ADMIN, USER } from "./credentials";
+import { ADMIN } from "./credentials";
 
 // Helper: open the Create Account dialog and select a user via the combobox
-async function openCreateDialog(
-  page: Parameters<Parameters<typeof test>[1]>[0],
-  userName: string,
-) {
+async function openCreateDialog(page: Page, userName: string) {
   await page.click('button:has-text("Create Account")');
   await expect(page.locator("text=Create New Account")).toBeVisible();
 

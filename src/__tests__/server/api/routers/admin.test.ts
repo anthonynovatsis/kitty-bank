@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, assert, beforeAll } from "vitest";
 import { TRPCError } from "@trpc/server";
 import { eq } from "drizzle-orm";
 import { cashAccounts } from "~/server/db/schema";
@@ -78,11 +78,14 @@ describe("admin.accounts.create", () => {
     });
 
     expect(result.type).toBe("cash");
-    expect(result.account.accountName).toBe("My Checking");
-    expect(result.account.accountType).toBe("checking");
-    expect(result.account.userId).toBe(targetUser.id);
-    expect(result.account.balance).toBe(0);
-    expect(result.account.status).toBe("active");
+    assert(result.account, "account should be defined");
+    expect(result.account).toMatchObject({
+      accountName: "My Checking",
+      accountType: "checking",
+      userId: targetUser.id,
+      balance: 0,
+      status: "active",
+    });
     expect(result.account.accountNumber).toMatch(/^\d{11}$/);
   });
 
@@ -95,9 +98,12 @@ describe("admin.accounts.create", () => {
     });
 
     expect(result.type).toBe("investment");
-    expect(result.account.accountName).toBe("My Portfolio");
-    expect(result.account.userId).toBe(targetUser.id);
-    expect(result.account.status).toBe("active");
+    assert(result.account, "account should be defined");
+    expect(result.account).toMatchObject({
+      accountName: "My Portfolio",
+      userId: targetUser.id,
+      status: "active",
+    });
   });
 
   it("throws NOT_FOUND for a non-existent userId", async () => {
@@ -165,6 +171,7 @@ describe("admin.accounts.list", () => {
       accountName: "Checking",
       cashAccountType: "checking",
     });
+    assert(account, "created account should be defined");
     await db
       .update(cashAccounts)
       .set({ status: "closed" })
@@ -237,6 +244,7 @@ describe("admin.accounts.update", () => {
       accountName: "Original Name",
       cashAccountType: "checking",
     });
+    assert(cash.account, "cash account should be defined");
     cashAccountId = cash.account.id;
 
     const investment = await caller.admin.accounts.create({
@@ -244,6 +252,7 @@ describe("admin.accounts.update", () => {
       accountType: "investment",
       accountName: "Original Portfolio",
     });
+    assert(investment.account, "investment account should be defined");
     investmentAccountId = investment.account.id;
   });
 
