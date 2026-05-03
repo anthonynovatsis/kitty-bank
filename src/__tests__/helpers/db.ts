@@ -1,0 +1,50 @@
+import { createClient } from "@libsql/client";
+import { drizzle } from "drizzle-orm/libsql";
+import { readFileSync } from "fs";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
+import * as schema from "~/server/db/schema";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const MIGRATIONS_DIR = join(__dirname, "../../../drizzle");
+
+// =============================================================================
+// PostgreSQL swap point
+//
+// To migrate this helper to PostgreSQL:
+//   1. Replace `createClient` / `@libsql/client` with a pg client (e.g. `pg` or `postgres`)
+//   2. Replace `drizzle/libsql` with `drizzle-orm/pg-core` (and update schema to pgTable)
+//   3. Update `runMigrations` to use the pg client's query method
+//   4. All test files that import from this helper remain unchanged
+// =============================================================================
+
+const MIGRATION_FILES = [
+  "0000_initial_schema.sql",
+  "0001_add_bank_account_tables.sql",
+];
+
+function loadStatements(): string[] {
+  return MIGRATION_FILES.flatMap((file) => {
+    const sql = readFileSync(join(MIGRATIONS_DIR, file), "utf-8");
+    return sql
+      .split("--> statement-breakpoint")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  });
+}
+
+export type TestDb = ReturnType<typeof drizzle<typeof schema>>;
+
+export function createTestDb() {
+  // In-memory SQLite: fast, fully isolated per test suite, zero cleanup needed.
+  const client = createClient({ url: ":memory:" });
+  const db = drizzle(client, { schema, casing: "snake_case" });
+
+  async function migrate() {
+    for (const statement of loadStatements()) {
+      await client.execute(statement);
+    }
+  }
+
+  return { db, client, migrate };
+}
