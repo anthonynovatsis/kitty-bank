@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { TRPCError } from "@trpc/server";
-import { holdings, cashAccounts, investmentAccounts } from "~/server/db/schema";
+import { holdings } from "~/server/db/schema";
 import { createTestDb } from "../../../helpers/db";
 import {
   insertAdminUser,
