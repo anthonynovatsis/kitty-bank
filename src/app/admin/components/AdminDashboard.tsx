@@ -63,6 +63,7 @@ export function AdminDashboard() {
             {["overview", "cash", "investment", "users"].map((tab) => (
               <button
                 key={tab}
+                data-testid={`tab-${tab}`}
                 onClick={() => setActiveTab(tab)}
                 className={`border-b-2 px-1 py-2 text-sm font-medium ${
                   activeTab === tab
@@ -344,6 +345,7 @@ export function AdminDashboard() {
                       </td>
                       <td className="py-3 pr-4">
                         <span
+                          data-testid="role-badge"
                           className={`inline-block rounded-full px-2 py-1 text-xs ${
                             user.isAdmin
                               ? "bg-purple-100 text-purple-800"
@@ -356,6 +358,7 @@ export function AdminDashboard() {
                       <td className="py-3">
                         <label className="flex cursor-pointer items-center gap-2">
                           <div
+                            data-testid="approval-toggle"
                             onClick={() => {
                               if (
                                 updateApprovalSettings.isPending &&
@@ -383,7 +386,7 @@ export function AdminDashboard() {
                               }`}
                             />
                           </div>
-                          <span className="text-xs text-gray-600">
+                          <span data-testid="approval-label" className="text-xs text-gray-600">
                             {user.requiresTransactionApproval ? "Yes" : "No"}
                           </span>
                         </label>

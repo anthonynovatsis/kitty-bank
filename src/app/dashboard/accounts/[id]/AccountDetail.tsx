@@ -13,6 +13,7 @@ function formatCurrency(amount: number) {
 function StatusBadge({ status }: { status: "active" | "closed" }) {
   return (
     <span
+      data-testid="status-badge"
       className={`inline-block rounded-full px-2 py-1 text-xs font-medium ${
         status === "active"
           ? "bg-green-100 text-green-800"
@@ -59,7 +60,7 @@ export function AccountDetail({ accountId }: { accountId: string }) {
   return (
     <div className="container mx-auto p-6">
       <div className="mb-6">
-        <Link href="/dashboard" className="text-sm text-blue-600 hover:underline">
+        <Link data-testid="back-to-dashboard" href="/dashboard" className="text-sm text-blue-600 hover:underline">
           ← Back to dashboard
         </Link>
       </div>
@@ -92,7 +93,7 @@ function CashAccountDetail({ account }: { account: CashAccount }) {
           <h1 className="text-3xl font-bold text-gray-900">
             {account.accountName}
           </h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <p data-testid="account-subtitle" className="mt-1 text-sm text-gray-500">
             {account.accountNumber} •{" "}
             <span className="capitalize">{account.accountType}</span>
           </p>
@@ -167,7 +168,7 @@ function InvestmentAccountDetail({ account }: { account: InvestmentAccount }) {
       </div>
 
       {/* Holdings table */}
-      <div className="rounded-lg bg-white p-6 shadow">
+      <div data-testid="holdings-section" className="rounded-lg bg-white p-6 shadow">
         <h2 className="mb-4 text-lg font-semibold text-gray-900">Holdings</h2>
         {account.holdings.length === 0 ? (
           <p className="text-gray-500">No holdings yet.</p>

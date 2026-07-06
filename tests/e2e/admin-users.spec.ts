@@ -7,14 +7,14 @@ test.describe("admin users tab — admin user", () => {
 
   test("Users tab is visible on the admin page", async ({ page }) => {
     await page.goto("/admin");
-    await expect(page.locator('button:has-text("Users")')).toBeVisible();
+    await expect(page.locator('[data-testid="tab-users"]')).toBeVisible();
   });
 
   test("clicking Users tab shows the user management table", async ({
     page,
   }) => {
     await page.goto("/admin");
-    await page.click('button:has-text("Users")');
+    await page.click('[data-testid="tab-users"]');
     await expect(
       page.locator("h3", { hasText: "User Management" }),
     ).toBeVisible();
@@ -22,35 +22,33 @@ test.describe("admin users tab — admin user", () => {
 
   test("users table lists the admin user", async ({ page }) => {
     await page.goto("/admin");
-    await page.click('button:has-text("Users")');
+    await page.click('[data-testid="tab-users"]');
     await expect(page.locator(`td:has-text("${ADMIN.email}")`)).toBeVisible();
   });
 
   test("users table lists the regular user", async ({ page }) => {
     await page.goto("/admin");
-    await page.click('button:has-text("Users")');
+    await page.click('[data-testid="tab-users"]');
     await expect(page.locator(`td:has-text("${USER.email}")`)).toBeVisible();
   });
 
   test("admin user shows Admin role badge", async ({ page }) => {
     await page.goto("/admin");
-    await page.click('button:has-text("Users")');
+    await page.click('[data-testid="tab-users"]');
 
-    // Role badge has inline-block + rounded-full classes; use exact text to
-    // avoid matching "Admin User" in the name cell
     const adminRow = page.locator("tr", { hasText: ADMIN.email });
     await expect(
-      adminRow.locator("span.inline-block", { hasText: "Admin" }),
+      adminRow.locator('[data-testid="role-badge"]', { hasText: "Admin" }),
     ).toBeVisible();
   });
 
   test("regular user shows User role badge", async ({ page }) => {
     await page.goto("/admin");
-    await page.click('button:has-text("Users")');
+    await page.click('[data-testid="tab-users"]');
 
     const userRow = page.locator("tr", { hasText: USER.email });
     await expect(
-      userRow.locator("span.inline-block", { hasText: "User" }),
+      userRow.locator('[data-testid="role-badge"]', { hasText: "User" }),
     ).toBeVisible();
   });
 
@@ -58,15 +56,14 @@ test.describe("admin users tab — admin user", () => {
     page,
   }) => {
     await page.goto("/admin");
-    await page.click('button:has-text("Users")');
+    await page.click('[data-testid="tab-users"]');
 
     const userRow = page.locator("tr", { hasText: USER.email });
     await expect(userRow).toBeVisible();
 
-    // The Yes/No label is inside the <label> element; the role badge is not
-    const toggleLabel = userRow.locator("label span.text-xs");
+    const toggleLabel = userRow.locator('[data-testid="approval-label"]');
     const toggleBefore = await toggleLabel.textContent();
-    await userRow.locator("div.rounded-full.cursor-pointer").click();
+    await userRow.locator('[data-testid="approval-toggle"]').click();
 
     const expectedAfter = toggleBefore?.trim() === "Yes" ? "No" : "Yes";
     await expect(toggleLabel).toHaveText(expectedAfter);

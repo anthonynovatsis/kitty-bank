@@ -82,9 +82,8 @@ test.describe("account detail — cash account", () => {
     await card.click();
     await expect(page).toHaveURL(/\/dashboard\/accounts\//);
 
-    // Type label is inside the subtitle paragraph next to the account number
-    await expect(page.locator("p:has-text('checking')")).toBeVisible();
-    await expect(page.locator("text=active")).toBeVisible();
+    await expect(page.locator("[data-testid='account-subtitle']")).toContainText("checking");
+    await expect(page.locator("[data-testid='status-badge']")).toContainText("active");
   });
 
   test("back to dashboard link returns to /dashboard", async ({ page }) => {
@@ -95,7 +94,7 @@ test.describe("account detail — cash account", () => {
     await card.click();
     await expect(page).toHaveURL(/\/dashboard\/accounts\//);
 
-    await page.click('a:has-text("Back to dashboard")');
+    await page.click('[data-testid="back-to-dashboard"]');
     await expect(page).toHaveURL(/\/dashboard$/);
   });
 });
@@ -140,8 +139,8 @@ test.describe("account detail — investment account", () => {
     ).toBeVisible();
     await expect(page.locator("text=Portfolio Value")).toBeVisible();
     await expect(page.locator("text=$0.00")).toBeVisible();
-    await expect(page.locator("h2", { hasText: "Holdings" })).toBeVisible();
-    await expect(page.locator("text=No holdings yet.")).toBeVisible();
+    await expect(page.locator("[data-testid='holdings-section']")).toBeVisible();
+    await expect(page.locator("[data-testid='holdings-section']")).toContainText("No holdings yet.");
   });
 
   test("investment detail page shows active status", async ({ page }) => {
@@ -151,7 +150,7 @@ test.describe("account detail — investment account", () => {
     });
     await card.click();
 
-    await expect(page.locator("text=active")).toBeVisible();
+    await expect(page.locator("[data-testid='status-badge']")).toContainText("active");
   });
 });
 
