@@ -1,8 +1,31 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page, type Browser } from "@playwright/test";
 import { ADMIN_AUTH_FILE } from "../../playwright.config";
 import { ADMIN } from "./credentials";
 
-// Helper: create an account via the admin UI
+// Helper: create an account via the admin UI (idempotent — skips if already exists)
+async function ensureAccount(
+  browser: Browser,
+  opts: {
+    userName: string;
+    accountName: string;
+    accountType: "cash" | "investment";
+    cashAccountType?: "checking" | "savings";
+  },
+) {
+  const context = await browser.newContext({ storageState: ADMIN_AUTH_FILE });
+  const page = await context.newPage();
+  try {
+    await page.goto("/dashboard");
+    const existing = page.locator('a[href*="/dashboard/accounts/"]', {
+      hasText: opts.accountName,
+    });
+    if ((await existing.count()) > 0) return;
+    await createAccount(page, opts);
+  } finally {
+    await context.close();
+  }
+}
+
 async function createAccount(
   page: Page,
   opts: {
@@ -37,14 +60,12 @@ test.describe("account detail — cash account", () => {
   test.use({ storageState: ADMIN_AUTH_FILE });
 
   test.beforeAll(async ({ browser }) => {
-    const page = await browser.newPage();
-    await createAccount(page, {
+    await ensureAccount(browser, {
       userName: ADMIN.name,
       accountName: "E2E Checking Detail",
       accountType: "cash",
       cashAccountType: "checking",
     });
-    await page.close();
   });
 
   test("clicking a cash account card navigates to detail page", async ({
@@ -53,7 +74,7 @@ test.describe("account detail — cash account", () => {
     await page.goto("/dashboard");
     const card = page.locator('a[href*="/dashboard/accounts/"]', {
       hasText: "E2E Checking Detail",
-    });
+    }).first();
     await expect(card).toBeVisible();
     await card.click();
 
@@ -64,7 +85,7 @@ test.describe("account detail — cash account", () => {
     await page.goto("/dashboard");
     const card = page.locator('a[href*="/dashboard/accounts/"]', {
       hasText: "E2E Checking Detail",
-    });
+    }).first();
     await card.click();
 
     await expect(
@@ -78,7 +99,7 @@ test.describe("account detail — cash account", () => {
     await page.goto("/dashboard");
     const card = page.locator('a[href*="/dashboard/accounts/"]', {
       hasText: "E2E Checking Detail",
-    });
+    }).first();
     await card.click();
     await expect(page).toHaveURL(/\/dashboard\/accounts\//);
 
@@ -90,7 +111,7 @@ test.describe("account detail — cash account", () => {
     await page.goto("/dashboard");
     const card = page.locator('a[href*="/dashboard/accounts/"]', {
       hasText: "E2E Checking Detail",
-    });
+    }).first();
     await card.click();
     await expect(page).toHaveURL(/\/dashboard\/accounts\//);
 
@@ -103,13 +124,11 @@ test.describe("account detail — investment account", () => {
   test.use({ storageState: ADMIN_AUTH_FILE });
 
   test.beforeAll(async ({ browser }) => {
-    const page = await browser.newPage();
-    await createAccount(page, {
+    await ensureAccount(browser, {
       userName: ADMIN.name,
       accountName: "E2E Portfolio Detail",
       accountType: "investment",
     });
-    await page.close();
   });
 
   test("clicking an investment account card navigates to detail page", async ({
@@ -118,7 +137,7 @@ test.describe("account detail — investment account", () => {
     await page.goto("/dashboard");
     const card = page.locator('a[href*="/dashboard/accounts/"]', {
       hasText: "E2E Portfolio Detail",
-    });
+    }).first();
     await expect(card).toBeVisible();
     await card.click();
 
@@ -131,7 +150,7 @@ test.describe("account detail — investment account", () => {
     await page.goto("/dashboard");
     const card = page.locator('a[href*="/dashboard/accounts/"]', {
       hasText: "E2E Portfolio Detail",
-    });
+    }).first();
     await card.click();
 
     await expect(
@@ -147,7 +166,7 @@ test.describe("account detail — investment account", () => {
     await page.goto("/dashboard");
     const card = page.locator('a[href*="/dashboard/accounts/"]', {
       hasText: "E2E Portfolio Detail",
-    });
+    }).first();
     await card.click();
 
     await expect(page.locator("[data-testid='status-badge']")).toContainText("active");
