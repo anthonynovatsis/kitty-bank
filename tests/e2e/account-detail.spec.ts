@@ -27,24 +27,29 @@ async function createAccount(
     await page.selectOption("#cash-account-type", opts.cashAccountType);
   }
 
-  page.on("dialog", (d) => d.accept());
+  const dialogPromise = page.waitForEvent("dialog");
   await page.click('button[type="submit"]:has-text("Create Account")');
-  await expect(page.locator(`text=${opts.accountName}`)).toBeVisible();
+  await (await dialogPromise).accept();
+  await page.waitForLoadState("networkidle");
 }
 
 test.describe("account detail — cash account", () => {
   test.use({ storageState: ADMIN_AUTH_FILE });
 
-  test("clicking a cash account card navigates to detail page", async ({
-    page,
-  }) => {
+  test.beforeAll(async ({ browser }) => {
+    const page = await browser.newPage();
     await createAccount(page, {
       userName: ADMIN.name,
       accountName: "E2E Checking Detail",
       accountType: "cash",
       cashAccountType: "checking",
     });
+    await page.close();
+  });
 
+  test("clicking a cash account card navigates to detail page", async ({
+    page,
+  }) => {
     await page.goto("/dashboard");
     const card = page.locator('a[href*="/dashboard/accounts/"]', {
       hasText: "E2E Checking Detail",
@@ -98,15 +103,19 @@ test.describe("account detail — cash account", () => {
 test.describe("account detail — investment account", () => {
   test.use({ storageState: ADMIN_AUTH_FILE });
 
-  test("clicking an investment account card navigates to detail page", async ({
-    page,
-  }) => {
+  test.beforeAll(async ({ browser }) => {
+    const page = await browser.newPage();
     await createAccount(page, {
       userName: ADMIN.name,
       accountName: "E2E Portfolio Detail",
       accountType: "investment",
     });
+    await page.close();
+  });
 
+  test("clicking an investment account card navigates to detail page", async ({
+    page,
+  }) => {
     await page.goto("/dashboard");
     const card = page.locator('a[href*="/dashboard/accounts/"]', {
       hasText: "E2E Portfolio Detail",
