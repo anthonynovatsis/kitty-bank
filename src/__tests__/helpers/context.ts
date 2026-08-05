@@ -27,7 +27,10 @@ type FakeSession = {
   user: FakeUser;
 };
 
-export function makeUser(overrides?: { email?: string; name?: string }): FakeUser {
+export function makeUser(overrides?: {
+  email?: string;
+  name?: string;
+}): FakeUser {
   const id = crypto.randomUUID();
   return {
     id,
@@ -56,10 +59,20 @@ export function makeSession(user: FakeUser): FakeSession {
   };
 }
 
-/** Insert a regular user row into the test DB. */
+/**
+ * Insert a regular user row into the test DB.
+ *
+ * Pass `requiresTransactionApproval` to also create a user_settings row. Left
+ * off, the user has no settings row at all and procedures fall back to their
+ * default — which is to require approval.
+ */
 export async function insertUser(
   db: TestDb,
-  overrides?: { email?: string; name?: string },
+  overrides?: {
+    email?: string;
+    name?: string;
+    requiresTransactionApproval?: boolean;
+  },
 ) {
   const user = makeUser(overrides);
   await db.insert(users).values({
@@ -67,6 +80,15 @@ export async function insertUser(
     email: user.email,
     name: user.name,
   });
+
+  if (overrides?.requiresTransactionApproval !== undefined) {
+    await db.insert(userSettings).values({
+      userId: user.id,
+      isAdmin: false,
+      requiresTransactionApproval: overrides.requiresTransactionApproval,
+    });
+  }
+
   return user;
 }
 

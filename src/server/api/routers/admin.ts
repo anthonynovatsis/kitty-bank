@@ -1,9 +1,14 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { eq, and, like } from "drizzle-orm";
+import { eq, and, asc, like } from "drizzle-orm";
 import { createTRPCRouter, adminProcedure } from "~/server/api/trpc";
 import {
+  assertSettleableType,
+  settleCashMovement,
+} from "~/server/services/cash";
+import {
   cashAccounts,
+  cashTransactions,
   investmentAccounts,
   users,
   userSettings,
@@ -322,6 +327,113 @@ export const adminRouter = createTRPCRouter({
             account: updatedAccount,
           };
         }
+      }),
+  }),
+
+  transactions: createTRPCRouter({
+    // The approval queue: every cash transaction awaiting a decision
+    pending: adminProcedure.query(async ({ ctx }) => {
+      const rows = await ctx.db.query.cashTransactions.findMany({
+        where: eq(cashTransactions.status, "pending"),
+        with: {
+          cashAccount: {
+            columns: {
+              id: true,
+              accountName: true,
+              accountNumber: true,
+              balance: true,
+              status: true,
+            },
+          },
+          fromAccount: {
+            columns: { id: true, accountName: true, accountNumber: true },
+          },
+          toAccount: {
+            columns: { id: true, accountName: true, accountNumber: true },
+          },
+          createdBy: {
+            columns: { id: true, name: true, email: true },
+          },
+        },
+        // Oldest first — the queue is worked front to back.
+        orderBy: [asc(cashTransactions.createdAt)],
+      });
+
+      return rows;
+    }),
+
+    // Approve (settling the balances) or reject a pending cash transaction
+    approve: adminProcedure
+      .input(
+        z.object({
+          transactionId: z.string(),
+          action: z.enum(["approve", "reject"]),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        const existing = await ctx.db.query.cashTransactions.findFirst({
+          where: eq(cashTransactions.id, input.transactionId),
+        });
+
+        if (!existing) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Transaction not found",
+          });
+        }
+
+        if (existing.status !== "pending") {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `Transaction is already ${existing.status}`,
+          });
+        }
+
+        const adminId = ctx.session.user.id;
+        const approvedAt = new Date();
+
+        if (input.action === "reject") {
+          const [rejected] = await ctx.db
+            .update(cashTransactions)
+            .set({
+              status: "rejected",
+              approvedByAdminId: adminId,
+              approvedAt,
+            })
+            .where(eq(cashTransactions.id, input.transactionId))
+            .returning();
+
+          return { transaction: rejected!, status: "rejected" as const };
+        }
+
+        // Bind to a local const so the narrowing survives into the closure below.
+        const transactionType = existing.transactionType;
+        assertSettleableType(transactionType);
+
+        // Settle and mark completed atomically — if the balances can no longer
+        // support the transaction (funds spent while it sat pending, account
+        // closed), settleCashMovement throws and the status change rolls back.
+        return ctx.db.transaction(async (tx) => {
+          await settleCashMovement(tx, {
+            transactionType,
+            cashAccountId: existing.cashAccountId,
+            fromAccountId: existing.fromAccountId,
+            toAccountId: existing.toAccountId,
+            amount: existing.amount,
+          });
+
+          const [completed] = await tx
+            .update(cashTransactions)
+            .set({
+              status: "completed",
+              approvedByAdminId: adminId,
+              approvedAt,
+            })
+            .where(eq(cashTransactions.id, input.transactionId))
+            .returning();
+
+          return { transaction: completed!, status: "completed" as const };
+        });
       }),
   }),
 });
