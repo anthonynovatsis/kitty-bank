@@ -73,6 +73,37 @@ export async function ensureAccount(
 }
 
 /**
+ * Force a user's `requires_transaction_approval` setting to a known value.
+ *
+ * Other specs toggle this flag, so anything depending on the approval workflow
+ * has to set it explicitly rather than assume the seeded default.
+ */
+export async function setApprovalRequirement(
+  browser: Browser,
+  email: string,
+  required: boolean,
+) {
+  const context = await browser.newContext({ storageState: ADMIN_AUTH_FILE });
+  try {
+    const page = await context.newPage();
+    await page.goto("/admin");
+    await page.click('[data-testid="tab-users"]');
+
+    const row = page.locator("tr", { hasText: email });
+    await expect(row).toBeVisible();
+
+    const label = row.locator('[data-testid="approval-label"]');
+    const want = required ? "Yes" : "No";
+    if ((await label.textContent())?.trim() !== want) {
+      await row.locator('[data-testid="approval-toggle"]').click();
+      await expect(label).toHaveText(want);
+    }
+  } finally {
+    await context.close();
+  }
+}
+
+/**
  * Sign up a brand-new user and return their session.
  *
  * For assertions that need a provably empty account list — the seeded users
@@ -101,4 +132,54 @@ export async function signUpFreshUser(browser: Browser) {
   await page.waitForURL("**/dashboard");
 
   return { context, page, email };
+}
+
+/** Open an account's detail page from the dashboard. */
+export async function openAccount(page: Page, accountName: string) {
+  await page.goto("/dashboard");
+  const card = page
+    .locator('a[href*="/dashboard/accounts/"]', { hasText: accountName })
+    .first();
+  await expect(card).toBeVisible();
+  await card.click();
+  await expect(page).toHaveURL(/\/dashboard\/accounts\//);
+}
+
+/** Read the numeric value out of the balance card on an account detail page. */
+export async function readBalance(page: Page): Promise<number> {
+  const locator = page.locator('[data-testid="account-balance"]');
+  await expect(locator).toBeVisible();
+  const text = (await locator.textContent()) ?? "";
+  return Number(text.replace(/[^0-9.-]/g, ""));
+}
+
+/** Fill in and submit the cash transaction form on an account detail page. */
+export async function submitTransaction(
+  page: Page,
+  opts: {
+    mode: "deposit" | "withdraw" | "transfer";
+    amount: number;
+    description?: string;
+    targetAccountName?: string;
+  },
+) {
+  await page.click(`[data-testid="mode-${opts.mode}"]`);
+  await page.fill('[data-testid="amount-input"]', String(opts.amount));
+
+  if (opts.description) {
+    await page.fill('[data-testid="description-input"]', opts.description);
+  }
+
+  if (opts.mode === "transfer") {
+    // Option labels carry the account number too, so match on text and read
+    // back the id rather than trying for an exact label match.
+    const select = page.locator('[data-testid="transfer-target"]');
+    const option = select.locator("option", {
+      hasText: opts.targetAccountName ?? "",
+    });
+    await expect(option.first()).toBeAttached();
+    await select.selectOption((await option.first().getAttribute("value"))!);
+  }
+
+  await page.click('[data-testid="submit-transaction"]');
 }
