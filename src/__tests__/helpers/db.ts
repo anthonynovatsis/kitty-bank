@@ -1,6 +1,7 @@
 import { createClient } from "@libsql/client";
 import { drizzle } from "drizzle-orm/libsql";
-import { readFileSync } from "fs";
+import { mkdtempSync, readFileSync, rmSync } from "fs";
+import { tmpdir } from "os";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import * as schema from "~/server/db/schema";
@@ -35,10 +36,32 @@ function loadStatements(): string[] {
 
 export type TestDb = ReturnType<typeof drizzle<typeof schema>>;
 
+/**
+ * Create an isolated SQLite database for one test suite.
+ *
+ * Backed by a temp *file*, not `:memory:`. LibSQL opens a separate connection
+ * for each `db.transaction()`, and every connection to `:memory:` gets its own
+ * empty database — so any code path using a transaction would silently leave
+ * the suite querying a blank DB afterwards. A per-suite temp file gives real
+ * transaction (and rollback) semantics for the same cost.
+ */
 export function createTestDb() {
-  // In-memory SQLite: fast, fully isolated per test suite, zero cleanup needed.
-  const client = createClient({ url: ":memory:" });
+  const dir = mkdtempSync(join(tmpdir(), "vale-bank-test-"));
+  const dbPath = join(dir, "test.db");
+
+  // Note the `file:` + path form (no `file:///`): the triple-slash absolute
+  // form makes @libsql/client open a fresh empty database and ignore the file.
+  const client = createClient({ url: `file:${dbPath}` });
   const db = drizzle(client, { schema, casing: "snake_case" });
+
+  // Suites don't manage the file's lifetime; drop the whole temp dir on exit.
+  process.on("exit", () => {
+    try {
+      rmSync(dir, { recursive: true, force: true });
+    } catch {
+      // best effort — the OS reclaims tmpdir anyway
+    }
+  });
 
   async function migrate() {
     for (const statement of loadStatements()) {
