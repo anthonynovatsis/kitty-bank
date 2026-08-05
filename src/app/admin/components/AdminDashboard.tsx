@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { api } from "~/trpc/react";
 import { CreateAccountDialog } from "./CreateAccountDialog";
+import { PendingTransactions } from "./PendingTransactions";
 
 export function AdminDashboard() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -14,8 +15,11 @@ export function AdminDashboard() {
     refetch: refetchAccounts,
   } = api.admin.accounts.list.useQuery({});
 
-  const { data: usersData, isLoading: usersLoading, refetch: refetchUsers } =
-    api.admin.users.list.useQuery();
+  const {
+    data: usersData,
+    isLoading: usersLoading,
+    refetch: refetchUsers,
+  } = api.admin.users.list.useQuery();
 
   const updateApprovalSettings =
     api.admin.users.updateApprovalSettings.useMutation({
@@ -60,22 +64,24 @@ export function AdminDashboard() {
       <div className="mb-6">
         <div className="border-b border-gray-200">
           <nav className="-mb-px flex space-x-8">
-            {["overview", "cash", "investment", "users"].map((tab) => (
-              <button
-                key={tab}
-                data-testid={`tab-${tab}`}
-                onClick={() => setActiveTab(tab)}
-                className={`border-b-2 px-1 py-2 text-sm font-medium ${
-                  activeTab === tab
-                    ? "border-blue-500 text-blue-600"
-                    : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
-                }`}
-              >
-                {tab.charAt(0).toUpperCase() + tab.slice(1)}{" "}
-                {tab === "cash" && "Accounts"}{" "}
-                {tab === "investment" && "Accounts"}
-              </button>
-            ))}
+            {["overview", "cash", "investment", "users", "transactions"].map(
+              (tab) => (
+                <button
+                  key={tab}
+                  data-testid={`tab-${tab}`}
+                  onClick={() => setActiveTab(tab)}
+                  className={`border-b-2 px-1 py-2 text-sm font-medium ${
+                    activeTab === tab
+                      ? "border-blue-500 text-blue-600"
+                      : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
+                  }`}
+                >
+                  {tab.charAt(0).toUpperCase() + tab.slice(1)}{" "}
+                  {tab === "cash" && "Accounts"}{" "}
+                  {tab === "investment" && "Accounts"}
+                </button>
+              ),
+            )}
           </nav>
         </div>
       </div>
@@ -306,13 +312,15 @@ export function AdminDashboard() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b text-left text-gray-500">
-                    <th className="pb-3 pr-4 font-medium">User</th>
-                    <th className="pb-3 pr-4 font-medium">Cash Accounts</th>
-                    <th className="pb-3 pr-4 font-medium">
+                    <th className="pr-4 pb-3 font-medium">User</th>
+                    <th className="pr-4 pb-3 font-medium">Cash Accounts</th>
+                    <th className="pr-4 pb-3 font-medium">
                       Investment Accounts
                     </th>
-                    <th className="pb-3 pr-4 font-medium">Total Cash Balance</th>
-                    <th className="pb-3 pr-4 font-medium">Role</th>
+                    <th className="pr-4 pb-3 font-medium">
+                      Total Cash Balance
+                    </th>
+                    <th className="pr-4 pb-3 font-medium">Role</th>
                     <th className="pb-3 font-medium">Requires Approval</th>
                   </tr>
                 </thead>
@@ -325,7 +333,8 @@ export function AdminDashboard() {
                       </td>
                       <td className="py-3 pr-4">
                         <span>{user.activeCashAccountCount} active</span>
-                        {user.cashAccountCount > user.activeCashAccountCount && (
+                        {user.cashAccountCount >
+                          user.activeCashAccountCount && (
                           <span className="ml-1 text-gray-400">
                             ({user.cashAccountCount} total)
                           </span>
@@ -386,7 +395,10 @@ export function AdminDashboard() {
                               }`}
                             />
                           </div>
-                          <span data-testid="approval-label" className="text-xs text-gray-600">
+                          <span
+                            data-testid="approval-label"
+                            className="text-xs text-gray-600"
+                          >
                             {user.requiresTransactionApproval ? "Yes" : "No"}
                           </span>
                         </label>
@@ -399,6 +411,9 @@ export function AdminDashboard() {
           )}
         </div>
       )}
+
+      {/* Transactions Tab */}
+      {activeTab === "transactions" && <PendingTransactions />}
 
       <CreateAccountDialog
         open={showCreateDialog}

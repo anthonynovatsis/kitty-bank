@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { api } from "~/trpc/react";
+import { CashTransactionForms } from "./CashTransactionForms";
+import { CashTransactionHistory } from "./CashTransactionHistory";
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("en-US", {
@@ -47,7 +49,10 @@ export function AccountDetail({ accountId }: { accountId: string }) {
               ? "Account not found."
               : "Failed to load account."}
           </p>
-          <Link href="/dashboard" className="mt-2 text-sm text-blue-600 hover:underline">
+          <Link
+            href="/dashboard"
+            className="mt-2 text-sm text-blue-600 hover:underline"
+          >
             Back to dashboard
           </Link>
         </div>
@@ -60,7 +65,11 @@ export function AccountDetail({ accountId }: { accountId: string }) {
   return (
     <div className="container mx-auto p-6">
       <div className="mb-6">
-        <Link data-testid="back-to-dashboard" href="/dashboard" className="text-sm text-blue-600 hover:underline">
+        <Link
+          data-testid="back-to-dashboard"
+          href="/dashboard"
+          className="text-sm text-blue-600 hover:underline"
+        >
           ← Back to dashboard
         </Link>
       </div>
@@ -93,7 +102,10 @@ function CashAccountDetail({ account }: { account: CashAccount }) {
           <h1 className="text-3xl font-bold text-gray-900">
             {account.accountName}
           </h1>
-          <p data-testid="account-subtitle" className="mt-1 text-sm text-gray-500">
+          <p
+            data-testid="account-subtitle"
+            className="mt-1 text-sm text-gray-500"
+          >
             {account.accountNumber} •{" "}
             <span className="capitalize">{account.accountType}</span>
           </p>
@@ -104,20 +116,22 @@ function CashAccountDetail({ account }: { account: CashAccount }) {
       {/* Balance card */}
       <div className="rounded-lg bg-white p-6 shadow">
         <p className="text-sm font-medium text-gray-500">Current Balance</p>
-        <p className="mt-1 text-4xl font-bold text-gray-900">
+        <p
+          data-testid="account-balance"
+          className="mt-1 text-4xl font-bold text-gray-900"
+        >
           {formatCurrency(account.balance)}
         </p>
       </div>
 
-      {/* Transactions placeholder */}
-      <div className="rounded-lg bg-white p-6 shadow">
-        <h2 className="mb-4 text-lg font-semibold text-gray-900">
-          Transaction History
-        </h2>
-        <p className="text-gray-500">
-          Deposits, withdrawals, and transfers coming soon.
-        </p>
-      </div>
+      {account.status === "active" && (
+        <CashTransactionForms
+          accountId={account.id}
+          balance={account.balance}
+        />
+      )}
+
+      <CashTransactionHistory accountId={account.id} />
     </div>
   );
 }
@@ -168,7 +182,10 @@ function InvestmentAccountDetail({ account }: { account: InvestmentAccount }) {
       </div>
 
       {/* Holdings table */}
-      <div data-testid="holdings-section" className="rounded-lg bg-white p-6 shadow">
+      <div
+        data-testid="holdings-section"
+        className="rounded-lg bg-white p-6 shadow"
+      >
         <h2 className="mb-4 text-lg font-semibold text-gray-900">Holdings</h2>
         {account.holdings.length === 0 ? (
           <p className="text-gray-500">No holdings yet.</p>
@@ -177,11 +194,11 @@ function InvestmentAccountDetail({ account }: { account: InvestmentAccount }) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b text-left text-gray-500">
-                  <th className="pb-3 pr-4 font-medium">Symbol</th>
-                  <th className="pb-3 pr-4 font-medium">Company</th>
-                  <th className="pb-3 pr-4 font-medium text-right">Quantity</th>
-                  <th className="pb-3 pr-4 font-medium text-right">Avg Cost</th>
-                  <th className="pb-3 font-medium text-right">Total Value</th>
+                  <th className="pr-4 pb-3 font-medium">Symbol</th>
+                  <th className="pr-4 pb-3 font-medium">Company</th>
+                  <th className="pr-4 pb-3 text-right font-medium">Quantity</th>
+                  <th className="pr-4 pb-3 text-right font-medium">Avg Cost</th>
+                  <th className="pb-3 text-right font-medium">Total Value</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -200,7 +217,9 @@ function InvestmentAccountDetail({ account }: { account: InvestmentAccount }) {
                       {formatCurrency(holding.averageCostBasis)}
                     </td>
                     <td className="py-3 text-right font-medium">
-                      {formatCurrency(holding.quantity * holding.averageCostBasis)}
+                      {formatCurrency(
+                        holding.quantity * holding.averageCostBasis,
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -212,12 +231,8 @@ function InvestmentAccountDetail({ account }: { account: InvestmentAccount }) {
 
       {/* Buy/sell placeholder */}
       <div className="rounded-lg bg-white p-6 shadow">
-        <h2 className="mb-4 text-lg font-semibold text-gray-900">
-          Trade
-        </h2>
-        <p className="text-gray-500">
-          Buy and sell orders coming soon.
-        </p>
+        <h2 className="mb-4 text-lg font-semibold text-gray-900">Trade</h2>
+        <p className="text-gray-500">Buy and sell orders coming soon.</p>
       </div>
     </div>
   );
