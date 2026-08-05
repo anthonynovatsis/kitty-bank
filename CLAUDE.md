@@ -39,6 +39,35 @@ Two procedure types in `src/server/api/trpc.ts`:
 
 Context passed to all procedures: `{ db, session, headers }`
 
+### Domain Services
+
+`src/server/services/` holds business logic shared by more than one router —
+`cash.ts` implements the money-movement rules used by both `user.cash.*` and
+`admin.transactions.approve`. Keep `routers/` for actual tRPC routers (every
+file there is registered in `root.ts`).
+
+Service functions take a `Transaction` (exported from `src/server/db/index.ts`)
+rather than the root `db`, so callers must wrap them in `ctx.db.transaction()`.
+That is what stops a transfer from debiting without crediting.
+
+### Testing
+
+```bash
+pnpm test         # Vitest unit tests (tRPC callers against a real migrated DB)
+pnpm test:e2e     # Playwright, real browser against a dev server on port 3001
+pnpm test:e2e:ui  # Playwright interactive UI mode
+```
+
+- Unit tests build a per-suite SQLite database via `src/__tests__/helpers/db.ts`.
+  It is backed by a **temp file, not `:memory:`** — LibSQL opens a fresh
+  connection per `db.transaction()`, and every connection to `:memory:` gets its
+  own empty database, so transactional code paths would silently break.
+- E2E specs share one database for the whole run and seed fixtures idempotently
+  (`tests/e2e/helpers.ts`). `workers: 1` is required: specs mutate each other's
+  users, so they cannot run in parallel.
+- Add `data-testid` attributes to anything a test needs to select, and select by
+  them rather than by text or CSS classes.
+
 ### Path Alias
 
 `~/*` maps to `./src/*` — use this for all internal imports.
@@ -54,7 +83,13 @@ DATABASE_URL        # Default: file:./db.sqlite
 
 ## Planned Features
 
-See `plans/bank_accounts_plan.md` for the full implementation plan. The project is building a banking app with:
+See `plans/bank_accounts_plan.md` for the full implementation plan and current
+phase status. The project is building a banking app with:
 - **Cash accounts** (checking/savings) and **investment accounts** (securities/holdings)
 - **Admin** and **user** roles with separate tRPC endpoints
-- Planned tables: `cash_accounts`, `investment_accounts`, `holdings`, `cash_transactions`, `investment_transactions`, `admin_roles`
+- Per-user `requires_transaction_approval`: trusted users' transactions settle
+  immediately, supervised users' queue for admin approval
+
+Phases 1 through 2C are complete (accounts, user management, cash transactions).
+Phase 3 — investment transactions, holdings, buy/sell — is next and will need
+its own service module alongside `cash.ts`.

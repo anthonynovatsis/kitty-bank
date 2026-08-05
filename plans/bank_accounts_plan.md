@@ -318,21 +318,41 @@ This document outlines the plan to add bank account management functionality to 
 
 **Result:** Working user administration system
 
-### Phase 2C: Cash Transaction System (Complete Slice)
+### Phase 2C: Cash Transaction System (Complete Slice) ✅
 **Admin API:**
-- [ ] `admin.transactions.pending` - List pending cash transactions  
-- [ ] `admin.transactions.approve` - Approve/reject cash transactions
+- [x] `admin.transactions.pending` - List pending cash transactions  
+- [x] `admin.transactions.approve` - Approve/reject cash transactions
+
+**User API:**
+- [x] `user.cash.deposit` - Submit deposit
+- [x] `user.cash.withdraw` - Submit withdrawal
+- [x] `user.cash.transfer` - Transfer between own accounts
+- [x] `user.cash.getTransactions` - Cash transaction history
 
 **User Interface:**
-- [ ] Cash deposit/withdrawal forms
-- [ ] Account transfer functionality
-- [ ] Transaction history display
+- [x] Cash deposit/withdrawal forms
+- [x] Account transfer functionality
+- [x] Transaction history display
 
 **Admin Interface:**
-- [ ] Transaction approval queue
-- [ ] Cash transaction processing
+- [x] Transaction approval queue (Transactions tab)
+- [x] Cash transaction processing
 
 **Result:** Working cash transaction system with approval workflow
+
+**Implementation notes:**
+- Money movement lives in `src/server/services/cash.ts`, shared by the submit
+  and approve paths so both validate and round identically.
+- Transfers are a *single* row anchored to the source account with both
+  `from_account_id` and `to_account_id` set. History queries match on all three
+  account columns, so one row appears on both sides with opposite direction.
+- Pending transactions do **not** reserve funds. The balance is re-checked at
+  approval time and approval fails if the money is gone — the status change and
+  the balance update share one db transaction, so nothing half-applies.
+- Auto-approved transactions go straight to `completed` and leave
+  `approved_by_admin_id` / `approved_at` null; no admin ever saw them.
+- `interest` and `fee` transaction types exist in the schema but no procedure
+  can create them yet; settling one throws.
 
 ### Phase 3: Investment Transaction System (Complete Slice)
 **Admin API:**
