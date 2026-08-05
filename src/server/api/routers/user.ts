@@ -6,6 +6,7 @@ import {
   type SettleableType,
   assertActive,
   assertSufficientFunds,
+  cashError,
   loadCashAccount,
   requiresApproval,
   roundToCents,
@@ -224,10 +225,10 @@ export const userRouter = createTRPCRouter({
       )
       .mutation(({ ctx, input }) => {
         if (input.fromAccountId === input.toAccountId) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Cannot transfer to the same account",
-          });
+          throw cashError(
+            "invalid_transfer",
+            "Cannot transfer to the same account",
+          );
         }
 
         return ctx.db.transaction(async (tx) => {

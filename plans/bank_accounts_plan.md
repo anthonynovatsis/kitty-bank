@@ -354,6 +354,31 @@ This document outlines the plan to add bank account management functionality to 
 - `interest` and `fee` transaction types exist in the schema but no procedure
   can create them yet; settling one throws.
 
+**Error convention (established here, applies to future services):**
+
+A single procedure can refuse for several different reasons that share one tRPC
+code — `user.cash.transfer` has four. So services throw via `cashError(kind,
+message)`, which attaches a `CashRuleViolation` (a plain `Error` carrying a
+`kind`) as the cause. Callers branch with `isCashError(err, kind)` instead of
+matching on message text.
+
+Codes follow the split: malformed input is `BAD_REQUEST`, state that forbids the
+operation is `CONFLICT`, missing rows are `NOT_FOUND`.
+
+| kind | code |
+|---|---|
+| `account_not_found` | NOT_FOUND |
+| `account_closed` | CONFLICT |
+| `insufficient_funds` | CONFLICT |
+| `invalid_transfer` | BAD_REQUEST |
+| `unsettleable_type` | CONFLICT |
+| `already_decided` | CONFLICT |
+
+The domain error is deliberately transport-free, so if a non-tRPC caller ever
+needs this logic (a scheduled interest-posting job, a bulk importer) the
+services can stop wrapping in `TRPCError` without changing any of the kinds.
+Phase 3's investment service should follow the same shape.
+
 ### Phase 3: Investment Transaction System (Complete Slice)
 **Admin API:**
 - [ ] Investment transaction approval endpoints

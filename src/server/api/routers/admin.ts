@@ -4,6 +4,7 @@ import { eq, and, asc, like } from "drizzle-orm";
 import { createTRPCRouter, adminProcedure } from "~/server/api/trpc";
 import {
   assertSettleableType,
+  cashError,
   settleCashMovement,
 } from "~/server/services/cash";
 import {
@@ -383,10 +384,10 @@ export const adminRouter = createTRPCRouter({
         }
 
         if (existing.status !== "pending") {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: `Transaction is already ${existing.status}`,
-          });
+          throw cashError(
+            "already_decided",
+            `Transaction is already ${existing.status}`,
+          );
         }
 
         const adminId = ctx.session.user.id;

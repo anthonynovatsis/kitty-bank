@@ -50,6 +50,13 @@ Service functions take a `Transaction` (exported from `src/server/db/index.ts`)
 rather than the root `db`, so callers must wrap them in `ctx.db.transaction()`.
 That is what stops a transfer from debiting without crediting.
 
+**Service errors** carry a machine-readable `kind`, because one procedure can
+refuse for several reasons that share a tRPC code. Throw with
+`cashError(kind, message)` and branch with `isCashError(err, kind)` — never by
+matching message text. Codes follow: malformed input is `BAD_REQUEST`, state
+that forbids the operation is `CONFLICT`. New services should copy this shape;
+see `plans/bank_accounts_plan.md` for the kind/code table.
+
 ### Testing
 
 ```bash

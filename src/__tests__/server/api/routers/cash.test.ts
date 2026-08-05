@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { TRPCError } from "@trpc/server";
 import { eq } from "drizzle-orm";
 import { cashAccounts, cashTransactions } from "~/server/db/schema";
+import { isCashError, type CashErrorKind } from "~/server/services/cash";
 import { createTestDb, type TestDb } from "../../../helpers/db";
 import {
   insertAdminUser,
@@ -18,6 +19,15 @@ async function expectTRPCError(
   const error = await promise.catch((e: unknown) => e);
   expect(error).toBeInstanceOf(TRPCError);
   expect((error as TRPCError).code).toBe(code);
+}
+
+/**
+ * Assert the specific cash rule that refused the operation. Several kinds share
+ * one tRPC code, so the code alone doesn't pin down which rule fired.
+ */
+async function expectCashError(promise: Promise<unknown>, kind: CashErrorKind) {
+  const error = await promise.catch((e: unknown) => e);
+  expect(isCashError(error, kind)).toBe(true);
 }
 
 /** Create a cash account for a user with a known starting balance. */
@@ -97,6 +107,96 @@ describe("user.cash middleware", () => {
       caller.user.cash.getTransactions({ accountId: "x" }),
       "UNAUTHORIZED",
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cash rule errors
+//
+// The point of the discriminant: one procedure refuses for several different
+// reasons, and a caller has to be able to tell them apart without reading
+// message strings.
+// ---------------------------------------------------------------------------
+
+describe("cash rule errors", () => {
+  const { db, migrate } = createTestDb();
+  let admin: FakeUser;
+  let trusted: FakeUser;
+
+  beforeAll(async () => {
+    await migrate();
+    admin = await insertAdminUser(db);
+    trusted = await insertUser(db, { requiresTransactionApproval: false });
+  });
+
+  it("distinguishes the ways a single procedure can refuse", async () => {
+    const open = await makeCashAccount(db, admin, trusted.id, {
+      name: "Rule Open",
+      balance: 10,
+    });
+    const otherOpen = await makeCashAccount(db, admin, trusted.id, {
+      name: "Rule Other",
+    });
+    const closed = await makeCashAccount(db, admin, trusted.id, {
+      name: "Rule Closed",
+      status: "closed",
+    });
+    const caller = createTestCaller(db, makeSession(trusted));
+
+    // Three different refusals, all from user.cash.transfer. Note the funds
+    // case needs an *open* destination — assertActive runs first.
+    const sameAccount = await caller.user.cash
+      .transfer({ fromAccountId: open, toAccountId: open, amount: 1 })
+      .catch((e: unknown) => e);
+    const noFunds = await caller.user.cash
+      .transfer({ fromAccountId: open, toAccountId: otherOpen, amount: 9999 })
+      .catch((e: unknown) => e);
+    const shut = await caller.user.cash
+      .transfer({ fromAccountId: open, toAccountId: closed, amount: 1 })
+      .catch((e: unknown) => e);
+
+    expect(isCashError(sameAccount, "invalid_transfer")).toBe(true);
+    expect(isCashError(noFunds, "insufficient_funds")).toBe(true);
+    expect(isCashError(shut, "account_closed")).toBe(true);
+
+    // ...and each is only its own kind.
+    expect(isCashError(sameAccount, "insufficient_funds")).toBe(false);
+    expect(isCashError(noFunds, "account_closed")).toBe(false);
+    expect(isCashError(shut, "invalid_transfer")).toBe(false);
+  });
+
+  it("maps state refusals to CONFLICT and malformed input to BAD_REQUEST", async () => {
+    const account = await makeCashAccount(db, admin, trusted.id, {
+      name: "Rule Codes",
+      balance: 5,
+    });
+    const caller = createTestCaller(db, makeSession(trusted));
+
+    await expectTRPCError(
+      caller.user.cash.withdraw({ accountId: account, amount: 100 }),
+      "CONFLICT",
+    );
+    await expectTRPCError(
+      caller.user.cash.transfer({
+        fromAccountId: account,
+        toAccountId: account,
+        amount: 1,
+      }),
+      "BAD_REQUEST",
+    );
+  });
+
+  it("does not classify unrelated errors as cash errors", async () => {
+    const caller = createTestCaller(db, makeSession(trusted));
+    const notFound = await caller.user.cash
+      .deposit({ accountId: "nope", amount: 1 })
+      .catch((e: unknown) => e);
+
+    // A genuine cash rule, but not the kind asked about.
+    expect(isCashError(notFound, "account_not_found")).toBe(true);
+    expect(isCashError(notFound, "insufficient_funds")).toBe(false);
+    expect(isCashError(new Error("something else"))).toBe(false);
+    expect(isCashError(undefined)).toBe(false);
   });
 });
 
@@ -212,15 +312,16 @@ describe("user.cash.deposit", () => {
     );
   });
 
-  it("throws BAD_REQUEST when the account is closed", async () => {
+  it("refuses to deposit into a closed account", async () => {
     const accountId = await makeCashAccount(db, admin, trusted.id, {
       name: "Closed",
       status: "closed",
     });
     const caller = createTestCaller(db, makeSession(trusted));
-    await expectTRPCError(
+    await expectCashError(
       caller.user.cash.deposit({ accountId, amount: 10 }),
-      "BAD_REQUEST",
+      "account_closed",
+
     );
   });
 
@@ -293,9 +394,10 @@ describe("user.cash.withdraw", () => {
     });
     const caller = createTestCaller(db, makeSession(trusted));
 
-    await expectTRPCError(
+    await expectCashError(
       caller.user.cash.withdraw({ accountId, amount: 40.01 }),
-      "BAD_REQUEST",
+      "insufficient_funds",
+
     );
     expect(await balanceOf(db, accountId)).toBe(40);
   });
@@ -307,9 +409,10 @@ describe("user.cash.withdraw", () => {
     });
     const caller = createTestCaller(db, makeSession(trusted));
 
-    await expectTRPCError(
+    await expectCashError(
       caller.user.cash.withdraw({ accountId, amount: 999 }),
-      "BAD_REQUEST",
+      "insufficient_funds",
+
     );
 
     const rows = await db.query.cashTransactions.findMany({
@@ -380,13 +483,13 @@ describe("user.cash.transfer", () => {
     });
     const caller = createTestCaller(db, makeSession(trusted));
 
-    await expectTRPCError(
+    await expectCashError(
       caller.user.cash.transfer({
         fromAccountId: accountId,
         toAccountId: accountId,
         amount: 10,
       }),
-      "BAD_REQUEST",
+      "invalid_transfer",
     );
     expect(await balanceOf(db, accountId)).toBe(100);
   });
@@ -425,13 +528,13 @@ describe("user.cash.transfer", () => {
     });
     const caller = createTestCaller(db, makeSession(trusted));
 
-    await expectTRPCError(
+    await expectCashError(
       caller.user.cash.transfer({
         fromAccountId: from,
         toAccountId: to,
         amount: 100,
       }),
-      "BAD_REQUEST",
+      "insufficient_funds",
     );
     expect(await balanceOf(db, from)).toBe(20);
     expect(await balanceOf(db, to)).toBe(0);
@@ -449,13 +552,13 @@ describe("user.cash.transfer", () => {
     });
     const caller = createTestCaller(db, makeSession(trusted));
 
-    await expectTRPCError(
+    await expectCashError(
       caller.user.cash.transfer({
         fromAccountId: from,
         toAccountId: to,
         amount: 50,
       }),
-      "BAD_REQUEST",
+      "account_closed",
     );
     expect(await balanceOf(db, from)).toBe(200);
     expect(await balanceOf(db, to)).toBe(0);
@@ -817,12 +920,12 @@ describe("admin.transactions.approve", () => {
       action: "approve",
     });
 
-    await expectTRPCError(
+    await expectCashError(
       caller.admin.transactions.approve({
         transactionId: id,
         action: "approve",
       }),
-      "BAD_REQUEST",
+      "already_decided",
     );
     // Balance credited exactly once.
     expect(await balanceOf(db, accountId)).toBe(50);
@@ -846,12 +949,12 @@ describe("admin.transactions.approve", () => {
       .where(eq(cashAccounts.id, accountId));
 
     const caller = createTestCaller(db, makeSession(admin));
-    await expectTRPCError(
+    await expectCashError(
       caller.admin.transactions.approve({
         transactionId: transaction.id,
         action: "approve",
       }),
-      "BAD_REQUEST",
+      "insufficient_funds",
     );
 
     // Neither the balance nor the status moved.
@@ -879,12 +982,12 @@ describe("admin.transactions.approve", () => {
       .where(eq(cashAccounts.id, accountId));
 
     const caller = createTestCaller(db, makeSession(admin));
-    await expectTRPCError(
+    await expectCashError(
       caller.admin.transactions.approve({
         transactionId: transaction.id,
         action: "approve",
       }),
-      "BAD_REQUEST",
+      "account_closed",
     );
 
     expect(await balanceOf(db, accountId)).toBe(500);
@@ -905,12 +1008,12 @@ describe("admin.transactions.approve", () => {
       transactionId: id,
       action: "reject",
     });
-    await expectTRPCError(
+    await expectCashError(
       caller.admin.transactions.approve({
         transactionId: id,
         action: "approve",
       }),
-      "BAD_REQUEST",
+      "already_decided",
     );
   });
 });

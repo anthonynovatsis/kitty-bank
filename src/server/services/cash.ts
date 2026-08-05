@@ -14,6 +14,72 @@ import { cashAccounts, userSettings } from "~/server/db/schema";
  * debit without crediting, so callers wrap these in `db.transaction()`.
  */
 
+/**
+ * Why a cash operation was refused.
+ *
+ * A single procedure can fail several ways that share one tRPC code —
+ * `user.cash.transfer` alone has four BAD_REQUESTs — so callers that need to
+ * tell them apart branch on this rather than parsing message strings.
+ */
+export type CashErrorKind =
+  | "account_not_found"
+  | "account_closed"
+  | "insufficient_funds"
+  | "invalid_transfer"
+  | "unsettleable_type"
+  | "already_decided";
+
+/** tRPC code per kind. Malformed input is 400; state that forbids the operation is 409. */
+const CODE_FOR_KIND = {
+  account_not_found: "NOT_FOUND",
+  account_closed: "CONFLICT",
+  insufficient_funds: "CONFLICT",
+  invalid_transfer: "BAD_REQUEST",
+  unsettleable_type: "CONFLICT",
+  already_decided: "CONFLICT",
+} as const;
+
+/**
+ * A refusal from the cash rules.
+ *
+ * This is a plain Error, deliberately: it carries no transport concepts, so the
+ * day something outside tRPC calls these helpers it is already the right shape.
+ * For now `cashError()` wraps it in a TRPCError for the routers.
+ */
+export class CashRuleViolation extends Error {
+  constructor(
+    readonly kind: CashErrorKind,
+    message: string,
+  ) {
+    super(message);
+    this.name = "CashRuleViolation";
+  }
+}
+
+/** Build the TRPCError the routers throw, with the domain error as its cause. */
+export function cashError(kind: CashErrorKind, message: string) {
+  return new TRPCError({
+    code: CODE_FOR_KIND[kind],
+    message,
+    cause: new CashRuleViolation(kind, message),
+  });
+}
+
+/**
+ * Narrow an unknown error to a cash refusal, optionally of one specific kind.
+ * Reads through the TRPCError wrapper, so it works on either form.
+ */
+export function isCashError(error: unknown, kind?: CashErrorKind): boolean {
+  const violation =
+    error instanceof CashRuleViolation
+      ? error
+      : error instanceof TRPCError && error.cause instanceof CashRuleViolation
+        ? error.cause
+        : null;
+
+  return violation !== null && (kind === undefined || violation.kind === kind);
+}
+
 export type SettleableType = "deposit" | "withdrawal" | "transfer";
 
 export type CashMovement = {
@@ -52,10 +118,7 @@ export async function loadCashAccount(tx: Transaction, accountId: string) {
   });
 
   if (!account) {
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: "Cash account not found",
-    });
+    throw cashError("account_not_found", "Cash account not found");
   }
 
   return account;
@@ -63,10 +126,10 @@ export async function loadCashAccount(tx: Transaction, accountId: string) {
 
 export function assertActive(account: { accountName: string; status: string }) {
   if (account.status !== "active") {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: `Account "${account.accountName}" is closed`,
-    });
+    throw cashError(
+      "account_closed",
+      `Account "${account.accountName}" is closed`,
+    );
   }
 }
 
@@ -75,12 +138,12 @@ export function assertSufficientFunds(
   amount: number,
 ) {
   if (account.balance + EPSILON < amount) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: `Insufficient funds in "${account.accountName}": balance ${account.balance.toFixed(
+    throw cashError(
+      "insufficient_funds",
+      `Insufficient funds in "${account.accountName}": balance ${account.balance.toFixed(
         2,
       )}, required ${amount.toFixed(2)}`,
-    });
+    );
   }
 }
 
@@ -123,10 +186,10 @@ export async function settleCashMovement(
     case "transfer": {
       const { fromAccountId, toAccountId } = movement;
       if (!fromAccountId || !toAccountId) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Transfer is missing its source or destination account",
-        });
+        throw cashError(
+          "invalid_transfer",
+          "Transfer is missing its source or destination account",
+        );
       }
 
       const from = await loadCashAccount(tx, fromAccountId);
@@ -155,9 +218,9 @@ export function assertSettleableType(
     transactionType !== "withdrawal" &&
     transactionType !== "transfer"
   ) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: `Cannot settle a "${transactionType}" transaction`,
-    });
+    throw cashError(
+      "unsettleable_type",
+      `Cannot settle a "${transactionType}" transaction`,
+    );
   }
 }
