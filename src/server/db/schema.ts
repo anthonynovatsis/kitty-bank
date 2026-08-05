@@ -344,11 +344,18 @@ export const userSettings = sqliteTable(
 
 // Relations
 
+// cash_transactions references cash_accounts three times (the anchor account
+// plus a transfer's two sides), so every pair needs an explicit relationName —
+// without one Drizzle cannot tell them apart and throws on any nested query.
 export const cashAccountRelations = relations(
   cashAccounts,
   ({ one, many }) => ({
     user: one(users, { fields: [cashAccounts.userId], references: [users.id] }),
-    transactions: many(cashTransactions),
+    transactions: many(cashTransactions, {
+      relationName: "accountTransactions",
+    }),
+    outgoingTransfers: many(cashTransactions, { relationName: "transferFrom" }),
+    incomingTransfers: many(cashTransactions, { relationName: "transferTo" }),
   }),
 );
 
@@ -398,14 +405,17 @@ export const cashTransactionRelations = relations(
     cashAccount: one(cashAccounts, {
       fields: [cashTransactions.cashAccountId],
       references: [cashAccounts.id],
+      relationName: "accountTransactions",
     }),
     fromAccount: one(cashAccounts, {
       fields: [cashTransactions.fromAccountId],
       references: [cashAccounts.id],
+      relationName: "transferFrom",
     }),
     toAccount: one(cashAccounts, {
       fields: [cashTransactions.toAccountId],
       references: [cashAccounts.id],
+      relationName: "transferTo",
     }),
     createdBy: one(users, {
       fields: [cashTransactions.createdByUserId],
