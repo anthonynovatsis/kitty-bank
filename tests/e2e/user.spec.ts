@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { ADMIN_AUTH_FILE, USER_AUTH_FILE } from "../../playwright.config";
 import { USER } from "./credentials";
+import { signUpFreshUser } from "./helpers";
 
 test.describe("dashboard — regular user", () => {
   test.use({ storageState: USER_AUTH_FILE });
@@ -9,9 +10,7 @@ test.describe("dashboard — regular user", () => {
     await page.goto("/dashboard");
     await expect(page).toHaveURL(/\/dashboard/);
     await expect(page.locator("text=Kitty Bank Dashboard")).toBeVisible();
-    await expect(
-      page.locator(`text=Welcome, ${USER.name}`),
-    ).toBeVisible();
+    await expect(page.locator(`text=Welcome, ${USER.name}`)).toBeVisible();
   });
 
   test("dashboard shows net worth summary", async ({ page }) => {
@@ -19,13 +18,19 @@ test.describe("dashboard — regular user", () => {
     await expect(page.locator("text=Total Net Worth")).toBeVisible();
   });
 
+  // Uses a throwaway signup rather than the seeded user, whose account list
+  // grows as other specs create fixtures.
   test("dashboard shows empty state when user has no accounts", async ({
-    page,
+    browser,
   }) => {
-    await page.goto("/dashboard");
-    await expect(
-      page.locator("text=No accounts yet. Contact your administrator"),
-    ).toBeVisible();
+    const { context, page: freshPage } = await signUpFreshUser(browser);
+    try {
+      await expect(
+        freshPage.locator("text=No accounts yet. Contact your administrator"),
+      ).toBeVisible();
+    } finally {
+      await context.close();
+    }
   });
 
   test("regular user cannot access /admin", async ({ page }) => {

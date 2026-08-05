@@ -8,6 +8,10 @@ export const USER_AUTH_FILE = "tests/e2e/.auth/user.json";
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: false, // share one DB, keep tests sequential
+  // fullyParallel:false only serialises tests *within* a file — separate files
+  // still get their own worker. One shared DB plus specs that mutate user
+  // settings means the whole run has to be single-threaded.
+  workers: 1,
   retries: 0,
   reporter: "list",
 
