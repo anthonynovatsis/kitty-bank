@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { api } from "~/trpc/react";
+import { Badge } from "~/app/_components/Badge";
 
 export function DashboardContent() {
   const {
@@ -62,9 +63,7 @@ export function DashboardContent() {
               <h3 className="font-medium text-gray-900">
                 {account.accountName}
               </h3>
-              <span className="rounded-full bg-blue-100 px-2 py-1 text-xs text-blue-800">
-                {account.accountType}
-              </span>
+              <Badge tone="info">{account.accountType}</Badge>
             </div>
             <p className="mt-2 text-2xl font-bold text-gray-900">
               ${account.balance.toFixed(2)}
@@ -86,9 +85,7 @@ export function DashboardContent() {
               <h3 className="font-medium text-gray-900">
                 {account.accountName}
               </h3>
-              <span className="rounded-full bg-purple-100 px-2 py-1 text-xs text-purple-800">
-                Investment
-              </span>
+              <Badge tone="accent">investment</Badge>
             </div>
             <p className="mt-2 text-2xl font-bold text-gray-900">
               ${account.totalValue.toFixed(2)}

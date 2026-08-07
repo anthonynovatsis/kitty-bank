@@ -69,7 +69,7 @@ test.describe("cash transactions — auto-approved user", () => {
       .first();
     await expect(row).toBeVisible();
     await expect(row.locator('[data-testid="transaction-status"]')).toHaveText(
-      "completed",
+      "Completed",
     );
     await expect(row.locator('[data-testid="transaction-type"]')).toContainText(
       "deposit",
@@ -227,7 +227,7 @@ test.describe("cash transactions — approval workflow", () => {
         .first();
       await expect(
         row.locator('[data-testid="transaction-status"]'),
-      ).toHaveText("pending");
+      ).toHaveText("Pending");
     } finally {
       await context.close();
     }
@@ -279,6 +279,11 @@ test.describe("cash transactions — approval workflow", () => {
       await expect(queueRow).toBeVisible();
       await expect(queueRow).toContainText(USER.email);
 
+      // The count badge appears only when the queue is non-empty.
+      await expect(
+        adminPage.locator('[data-testid="pending-count"]'),
+      ).toHaveText(/^\d+ Pending$/);
+
       await queueRow.locator('[data-testid="approve-button"]').click();
       await expect(queueRow).toHaveCount(0);
     } finally {
@@ -301,7 +306,7 @@ test.describe("cash transactions — approval workflow", () => {
         .first();
       await expect(
         row.locator('[data-testid="transaction-status"]'),
-      ).toHaveText("completed");
+      ).toHaveText("Completed");
     } finally {
       await verifyContext.close();
     }
@@ -365,7 +370,7 @@ test.describe("cash transactions — approval workflow", () => {
         .first();
       await expect(
         row.locator('[data-testid="transaction-status"]'),
-      ).toHaveText("rejected");
+      ).toHaveText("Rejected");
     } finally {
       await verifyContext.close();
     }
@@ -380,5 +385,54 @@ test.describe("transaction queue — access control", () => {
   }) => {
     await page.goto("/admin");
     await expect(page).not.toHaveURL(/\/admin/);
+  });
+});
+
+test.describe("badges", () => {
+  test.use({ storageState: ADMIN_AUTH_FILE });
+
+  test("the pending count badge is hidden when the queue is empty", async ({
+    page,
+  }) => {
+    await page.goto("/admin");
+    await page.click('[data-testid="tab-transactions"]');
+    await expect(
+      page.locator('[data-testid="pending-transactions"]'),
+    ).toBeVisible();
+
+    const queued = await page
+      .locator('[data-testid="pending-transaction-row"]')
+      .count();
+    const badge = page.locator('[data-testid="pending-count"]');
+
+    if (queued === 0) {
+      await expect(badge).toHaveCount(0);
+      await expect(
+        page.locator('[data-testid="no-pending-transactions"]'),
+      ).toBeVisible();
+    } else {
+      await expect(badge).toHaveText(`${queued} Pending`);
+    }
+  });
+
+  test("status badges are sentence-cased", async ({ page }) => {
+    await openAccount(page, SOURCE);
+    // History loads asynchronously — wait for a row before reading the badges,
+    // or allTextContents() returns an empty list and the loop asserts nothing.
+    await expect(
+      page.locator('[data-testid="transaction-row"]').first(),
+    ).toBeVisible();
+
+    // Every status badge on the page starts with an uppercase letter.
+    const statuses = await page
+      .locator('[data-testid="transaction-status"]')
+      .allTextContents();
+    expect(statuses.length).toBeGreaterThan(0);
+    for (const status of statuses) {
+      expect(status.charAt(0)).toBe(status.charAt(0).toUpperCase());
+    }
+    await expect(page.locator('[data-testid="status-badge"]')).toHaveText(
+      "Active",
+    );
   });
 });

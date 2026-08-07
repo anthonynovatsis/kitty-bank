@@ -1,6 +1,7 @@
 "use client";
 
 import { api } from "~/trpc/react";
+import { Badge, statusTone } from "~/app/_components/Badge";
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("en-US", {
@@ -8,13 +9,6 @@ function formatCurrency(amount: number) {
     currency: "USD",
   }).format(amount);
 }
-
-const STATUS_STYLES: Record<string, string> = {
-  completed: "bg-green-100 text-green-800",
-  pending: "bg-yellow-100 text-yellow-800",
-  rejected: "bg-red-100 text-red-800",
-  approved: "bg-blue-100 text-blue-800",
-};
 
 export function CashTransactionHistory({ accountId }: { accountId: string }) {
   const { data, isLoading } = api.user.cash.getTransactions.useQuery({
@@ -84,15 +78,12 @@ export function CashTransactionHistory({ accountId }: { accountId: string }) {
                     {formatCurrency(transaction.amount)}
                   </td>
                   <td className="py-3">
-                    <span
-                      data-testid="transaction-status"
-                      className={`inline-block rounded-full px-2 py-1 text-xs font-medium ${
-                        STATUS_STYLES[transaction.status] ??
-                        "bg-gray-100 text-gray-600"
-                      }`}
+                    <Badge
+                      tone={statusTone(transaction.status)}
+                      testId="transaction-status"
                     >
                       {transaction.status}
-                    </span>
+                    </Badge>
                   </td>
                 </tr>
               ))}

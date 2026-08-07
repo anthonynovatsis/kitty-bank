@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { api } from "~/trpc/react";
+import { Badge, statusTone } from "~/app/_components/Badge";
 import { CashTransactionForms } from "./CashTransactionForms";
 import { CashTransactionHistory } from "./CashTransactionHistory";
 
@@ -14,16 +15,9 @@ function formatCurrency(amount: number) {
 
 function StatusBadge({ status }: { status: "active" | "closed" }) {
   return (
-    <span
-      data-testid="status-badge"
-      className={`inline-block rounded-full px-2 py-1 text-xs font-medium ${
-        status === "active"
-          ? "bg-green-100 text-green-800"
-          : "bg-gray-100 text-gray-600"
-      }`}
-    >
+    <Badge tone={statusTone(status)} testId="status-badge">
       {status}
-    </span>
+    </Badge>
   );
 }
 

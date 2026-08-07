@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { api } from "~/trpc/react";
+import { Badge, statusTone } from "~/app/_components/Badge";
 import { CreateAccountDialog } from "./CreateAccountDialog";
 import { PendingTransactions } from "./PendingTransactions";
 
@@ -154,15 +155,9 @@ export function AdminDashboard() {
                       <p className="font-medium">
                         {formatCurrency(account.balance)}
                       </p>
-                      <span
-                        className={`inline-block rounded-full px-2 py-1 text-xs ${
-                          account.status === "active"
-                            ? "bg-green-100 text-green-800"
-                            : "bg-gray-100 text-gray-800"
-                        }`}
-                      >
+                      <Badge tone={statusTone(account.status)}>
                         {account.status}
-                      </span>
+                      </Badge>
                     </div>
                   </div>
                 ))}
@@ -192,15 +187,9 @@ export function AdminDashboard() {
                       <p className="font-medium">
                         {formatCurrency(account.totalValue)}
                       </p>
-                      <span
-                        className={`inline-block rounded-full px-2 py-1 text-xs ${
-                          account.status === "active"
-                            ? "bg-green-100 text-green-800"
-                            : "bg-gray-100 text-gray-800"
-                        }`}
-                      >
+                      <Badge tone={statusTone(account.status)}>
                         {account.status}
-                      </span>
+                      </Badge>
                     </div>
                   </div>
                 ))}
@@ -240,15 +229,9 @@ export function AdminDashboard() {
                     <p className="text-lg font-medium">
                       {formatCurrency(account.balance)}
                     </p>
-                    <span
-                      className={`inline-block rounded-full px-2 py-1 text-xs ${
-                        account.status === "active"
-                          ? "bg-green-100 text-green-800"
-                          : "bg-gray-100 text-gray-800"
-                      }`}
-                    >
-                      {account.status}
-                    </span>
+                    <Badge tone={statusTone(account.status)}>
+                        {account.status}
+                      </Badge>
                   </div>
                 </div>
               ))}
@@ -284,15 +267,9 @@ export function AdminDashboard() {
                     <p className="text-lg font-medium">
                       {formatCurrency(account.totalValue)}
                     </p>
-                    <span
-                      className={`inline-block rounded-full px-2 py-1 text-xs ${
-                        account.status === "active"
-                          ? "bg-green-100 text-green-800"
-                          : "bg-gray-100 text-gray-800"
-                      }`}
-                    >
-                      {account.status}
-                    </span>
+                    <Badge tone={statusTone(account.status)}>
+                        {account.status}
+                      </Badge>
                   </div>
                 </div>
               ))}
@@ -353,16 +330,12 @@ export function AdminDashboard() {
                         {formatCurrency(user.totalCashBalance)}
                       </td>
                       <td className="py-3 pr-4">
-                        <span
-                          data-testid="role-badge"
-                          className={`inline-block rounded-full px-2 py-1 text-xs ${
-                            user.isAdmin
-                              ? "bg-purple-100 text-purple-800"
-                              : "bg-gray-100 text-gray-600"
-                          }`}
+                        <Badge
+                          tone={user.isAdmin ? "accent" : "neutral"}
+                          testId="role-badge"
                         >
                           {user.isAdmin ? "Admin" : "User"}
-                        </span>
+                        </Badge>
                       </td>
                       <td className="py-3">
                         <label className="flex cursor-pointer items-center gap-2">

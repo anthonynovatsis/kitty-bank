@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { api } from "~/trpc/react";
+import { Badge } from "~/app/_components/Badge";
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("en-US", {
@@ -44,12 +45,13 @@ export function PendingTransactions() {
     >
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-lg font-medium">Transaction Approval Queue</h3>
-        <span
-          data-testid="pending-count"
-          className="rounded-full bg-yellow-100 px-2 py-1 text-xs font-medium text-yellow-800"
-        >
-          {transactions.length} pending
-        </span>
+        {/* Nothing to count is already said by the empty state below, so the
+            badge only appears when there is actually a queue. */}
+        {transactions.length > 0 && (
+          <Badge tone="warning" testId="pending-count">
+            {`${transactions.length} Pending`}
+          </Badge>
+        )}
       </div>
 
       {error && (
@@ -99,13 +101,13 @@ export function PendingTransactions() {
                           before it was submitted should be able to see that. */}
                       {transaction.transactionDate.toDateString() !==
                         transaction.createdAt.toDateString() && (
-                        <span
-                          data-testid="backdated-marker"
+                        <Badge
+                          tone="warning"
+                          testId="backdated-marker"
                           title={`Submitted ${transaction.createdAt.toLocaleDateString()}`}
-                          className="ml-1 text-xs text-amber-700"
                         >
                           back-dated
-                        </span>
+                        </Badge>
                       )}
                     </td>
                     <td className="py-3 pr-4">

@@ -63,7 +63,7 @@ test.describe("account detail — cash account", () => {
       page.locator("[data-testid='account-subtitle']"),
     ).toContainText("checking");
     await expect(page.locator("[data-testid='status-badge']")).toContainText(
-      "active",
+      "Active",
     );
   });
 
@@ -143,7 +143,7 @@ test.describe("account detail — investment account", () => {
     await card.click();
 
     await expect(page.locator("[data-testid='status-badge']")).toContainText(
-      "active",
+      "Active",
     );
   });
 });
