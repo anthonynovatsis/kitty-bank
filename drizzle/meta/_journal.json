@@ -14,6 +14,13 @@
       "when": 1776170094001,
       "tag": "0001_add_bank_account_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1786144689031,
+      "tag": "0002_add_cash_transaction_date",
+      "breakpoints": true
     }
   ]
 }

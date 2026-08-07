@@ -70,6 +70,7 @@ export function PendingTransactions() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-left text-gray-500">
+                <th className="pr-4 pb-3 font-medium">Date</th>
                 <th className="pr-4 pb-3 font-medium">User</th>
                 <th className="pr-4 pb-3 font-medium">Type</th>
                 <th className="pr-4 pb-3 font-medium">Account</th>
@@ -89,6 +90,24 @@ export function PendingTransactions() {
                     key={transaction.id}
                     data-testid="pending-transaction-row"
                   >
+                    <td
+                      data-testid="pending-transaction-date"
+                      className="py-3 pr-4 whitespace-nowrap text-gray-600"
+                    >
+                      {transaction.transactionDate.toLocaleDateString()}
+                      {/* Flag back-dating: an admin approving something dated
+                          before it was submitted should be able to see that. */}
+                      {transaction.transactionDate.toDateString() !==
+                        transaction.createdAt.toDateString() && (
+                        <span
+                          data-testid="backdated-marker"
+                          title={`Submitted ${transaction.createdAt.toLocaleDateString()}`}
+                          className="ml-1 text-xs text-amber-700"
+                        >
+                          back-dated
+                        </span>
+                      )}
+                    </td>
                     <td className="py-3 pr-4">
                       <p className="font-medium">
                         {transaction.createdBy.name ?? "—"}

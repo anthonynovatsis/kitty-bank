@@ -356,7 +356,9 @@ export const adminRouter = createTRPCRouter({
             columns: { id: true, name: true, email: true },
           },
         },
-        // Oldest first — the queue is worked front to back.
+        // Oldest *submission* first — the queue is worked front to back.
+        // Deliberately not transactionDate: back-dating records when the money
+        // moved, and must not let a request jump the queue.
         orderBy: [asc(cashTransactions.createdAt)],
       });
 

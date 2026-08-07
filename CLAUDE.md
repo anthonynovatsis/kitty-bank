@@ -14,7 +14,7 @@ pnpm typecheck    # TypeScript check only
 pnpm format:write # Format all files with Prettier
 
 # Database
-pnpm db:generate  # Generate Drizzle migrations from schema changes
+pnpm db:generate --name=add_foo_column  # Generate a migration (ALWAYS pass --name)
 pnpm db:migrate   # Apply migrations
 pnpm db:push      # Push schema directly (dev only)
 pnpm db:studio    # Open Drizzle Studio UI
@@ -38,6 +38,18 @@ Two procedure types in `src/server/api/trpc.ts`:
 - `protectedProcedure` — throws `UNAUTHORIZED` if no valid session; use for all user-facing data operations
 
 Context passed to all procedures: `{ db, session, headers }`
+
+### Migrations
+
+Always pass `--name=<snake_case_description>` to `pnpm db:generate`. Never keep
+drizzle-kit's random names (`0002_melodic_starjammers`) — the migration list
+should read as a history of schema changes.
+
+Check the generated SQL before committing it. For a new non-nullable column,
+drizzle-kit emits `ADD COLUMN ... NOT NULL`, which SQLite only accepts while the
+table is **empty**; add a constant `DEFAULT` plus a backfill `UPDATE` so it also
+applies to a database with data. Hand-editing is safe — drizzle-kit diffs the
+schema against `drizzle/meta/*_snapshot.json`, not the live database.
 
 ### Domain Services
 

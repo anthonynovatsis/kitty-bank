@@ -11,6 +11,24 @@ const MODES: { id: Mode; label: string }[] = [
   { id: "transfer", label: "Transfer" },
 ];
 
+/** Today as `YYYY-MM-DD` in the viewer's timezone, for the date input's bounds. */
+function todayString() {
+  const now = new Date();
+  const offset = now.getTimezoneOffset() * 60_000;
+  return new Date(now.getTime() - offset).toISOString().slice(0, 10);
+}
+
+/**
+ * Turn the date input's `YYYY-MM-DD` into local midnight.
+ *
+ * `new Date("2026-08-08")` parses as *UTC* midnight, which is still in the
+ * future for anyone east of UTC early in the day — the server would then reject
+ * today's date as forward-dated. The explicit time component parses as local.
+ */
+function parseDateInput(value: string) {
+  return new Date(`${value}T00:00:00`);
+}
+
 export function CashTransactionForms({
   accountId,
   balance,
@@ -21,6 +39,8 @@ export function CashTransactionForms({
   const [mode, setMode] = useState<Mode>("deposit");
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
+  // Defaults to today, so the common case needs no interaction.
+  const [transactionDate, setTransactionDate] = useState(todayString());
   const [targetAccountId, setTargetAccountId] = useState("");
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -38,6 +58,7 @@ export function CashTransactionForms({
     setAmount("");
     setDescription("");
     setTargetAccountId("");
+    setTransactionDate(todayString());
   };
 
   const onSuccess = (data: { status: string }) => {
@@ -76,8 +97,14 @@ export function CashTransactionForms({
       return;
     }
 
+    if (!transactionDate) {
+      setError("Choose a transaction date.");
+      return;
+    }
+
     const shared = {
       amount: parsed,
+      transactionDate: parseDateInput(transactionDate),
       ...(description.trim() && { description: description.trim() }),
     };
 
@@ -187,6 +214,28 @@ export function CashTransactionForms({
             )}
           </div>
         )}
+
+        <div>
+          <label
+            htmlFor="transaction-date"
+            className="mb-1 block text-sm font-medium text-gray-700"
+          >
+            Date *
+          </label>
+          <input
+            id="transaction-date"
+            data-testid="transaction-date-input"
+            type="date"
+            value={transactionDate}
+            max={todayString()}
+            onChange={(e) => setTransactionDate(e.target.value)}
+            className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500 focus:outline-none"
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            When the money moved. Defaults to today; back-date to record a past
+            transaction.
+          </p>
+        </div>
 
         <div>
           <label

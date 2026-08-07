@@ -1017,3 +1017,220 @@ describe("admin.transactions.approve", () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// Transaction dates
+//
+// transaction_date is when the money moved and may be back-dated; created_at
+// stays the audit trail of when the row was entered.
+// ---------------------------------------------------------------------------
+
+describe("transaction dates", () => {
+  const { db, migrate } = createTestDb();
+  let admin: FakeUser;
+  let trusted: FakeUser;
+  let supervised: FakeUser;
+
+  const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000);
+
+  beforeAll(async () => {
+    await migrate();
+    admin = await insertAdminUser(db);
+    trusted = await insertUser(db, { requiresTransactionApproval: false });
+    supervised = await insertUser(db, { requiresTransactionApproval: true });
+  });
+
+  it("defaults to now when no date is given", async () => {
+    const accountId = await makeCashAccount(db, admin, trusted.id, {
+      name: "Date Default",
+    });
+    const caller = createTestCaller(db, makeSession(trusted));
+
+    const before = Date.now();
+    const { transaction } = await caller.user.cash.deposit({
+      accountId,
+      amount: 10,
+    });
+
+    expect(transaction.transactionDate.getTime()).toBeGreaterThanOrEqual(
+      before - 1000,
+    );
+    expect(transaction.transactionDate.getTime()).toBeLessThanOrEqual(
+      Date.now() + 1000,
+    );
+  });
+
+  it("stores a back-dated transaction date", async () => {
+    const accountId = await makeCashAccount(db, admin, trusted.id, {
+      name: "Date Backdated",
+    });
+    const caller = createTestCaller(db, makeSession(trusted));
+    const when = daysAgo(45);
+
+    const { transaction } = await caller.user.cash.deposit({
+      accountId,
+      amount: 10,
+      transactionDate: when,
+    });
+
+    // Stored to second precision, so compare at that granularity.
+    expect(Math.floor(transaction.transactionDate.getTime() / 1000)).toBe(
+      Math.floor(when.getTime() / 1000),
+    );
+  });
+
+  it("keeps createdAt as the audit trail of when the row was entered", async () => {
+    const accountId = await makeCashAccount(db, admin, trusted.id, {
+      name: "Date Audit",
+    });
+    const caller = createTestCaller(db, makeSession(trusted));
+
+    const { transaction } = await caller.user.cash.deposit({
+      accountId,
+      amount: 10,
+      transactionDate: daysAgo(90),
+    });
+
+    // Back-dated 90 days, but recorded now.
+    expect(Date.now() - transaction.createdAt.getTime()).toBeLessThan(60_000);
+    expect(transaction.createdAt.getTime()).toBeGreaterThan(
+      transaction.transactionDate.getTime(),
+    );
+  });
+
+  it("rejects a future transaction date", async () => {
+    const accountId = await makeCashAccount(db, admin, trusted.id, {
+      name: "Date Future",
+    });
+    const caller = createTestCaller(db, makeSession(trusted));
+
+    await expectTRPCError(
+      caller.user.cash.deposit({
+        accountId,
+        amount: 10,
+        transactionDate: daysAgo(-1),
+      }),
+      "BAD_REQUEST",
+    );
+  });
+
+  it("accepts a withdrawal and transfer date too", async () => {
+    const from = await makeCashAccount(db, admin, trusted.id, {
+      name: "Date From",
+      balance: 500,
+    });
+    const to = await makeCashAccount(db, admin, trusted.id, {
+      name: "Date To",
+    });
+    const caller = createTestCaller(db, makeSession(trusted));
+    const when = daysAgo(7);
+
+    const w = await caller.user.cash.withdraw({
+      accountId: from,
+      amount: 10,
+      transactionDate: when,
+    });
+    const t = await caller.user.cash.transfer({
+      fromAccountId: from,
+      toAccountId: to,
+      amount: 10,
+      transactionDate: when,
+    });
+
+    expect(Math.floor(w.transaction.transactionDate.getTime() / 1000)).toBe(
+      Math.floor(when.getTime() / 1000),
+    );
+    expect(Math.floor(t.transaction.transactionDate.getTime() / 1000)).toBe(
+      Math.floor(when.getTime() / 1000),
+    );
+  });
+
+  it("orders history by when the money moved, not when it was entered", async () => {
+    const accountId = await makeCashAccount(db, admin, trusted.id, {
+      name: "Date Ordering",
+    });
+    const caller = createTestCaller(db, makeSession(trusted));
+
+    // Entered newest-date-first, so createdAt order is the reverse of the
+    // expected result — if history sorted by createdAt this test would fail.
+    await caller.user.cash.deposit({
+      accountId,
+      amount: 1,
+      description: "today",
+    });
+    await caller.user.cash.deposit({
+      accountId,
+      amount: 2,
+      description: "thirty days ago",
+      transactionDate: daysAgo(30),
+    });
+    await caller.user.cash.deposit({
+      accountId,
+      amount: 3,
+      description: "ten days ago",
+      transactionDate: daysAgo(10),
+    });
+
+    const rows = await caller.user.cash.getTransactions({ accountId });
+
+    expect(rows.map((r) => r.description)).toEqual([
+      "today",
+      "ten days ago",
+      "thirty days ago",
+    ]);
+  });
+
+  it("preserves the transaction date through admin approval", async () => {
+    const accountId = await makeCashAccount(db, admin, supervised.id, {
+      name: "Date Through Approval",
+    });
+    const when = daysAgo(20);
+
+    const { transaction } = await createTestCaller(
+      db,
+      makeSession(supervised),
+    ).user.cash.deposit({
+      accountId,
+      amount: 75,
+      transactionDate: when,
+    });
+
+    const result = await createTestCaller(
+      db,
+      makeSession(admin),
+    ).admin.transactions.approve({
+      transactionId: transaction.id,
+      action: "approve",
+    });
+
+    expect(result.status).toBe("completed");
+    expect(
+      Math.floor(result.transaction.transactionDate.getTime() / 1000),
+    ).toBe(Math.floor(when.getTime() / 1000));
+    expect(await balanceOf(db, accountId)).toBe(75);
+  });
+
+  it("exposes the transaction date on the admin queue", async () => {
+    const accountId = await makeCashAccount(db, admin, supervised.id, {
+      name: "Date On Queue",
+    });
+    const when = daysAgo(5);
+
+    await createTestCaller(db, makeSession(supervised)).user.cash.deposit({
+      accountId,
+      amount: 60,
+      description: "queued backdated",
+      transactionDate: when,
+    });
+
+    const rows = await createTestCaller(
+      db,
+      makeSession(admin),
+    ).admin.transactions.pending();
+
+    const row = rows.find((r) => r.description === "queued backdated");
+    expect(Math.floor(row!.transactionDate.getTime() / 1000)).toBe(
+      Math.floor(when.getTime() / 1000),
+    );
+  });
+});

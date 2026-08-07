@@ -1,6 +1,6 @@
 import { createClient } from "@libsql/client";
 import { drizzle } from "drizzle-orm/libsql";
-import { mkdtempSync, readFileSync, rmSync } from "fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
@@ -19,18 +19,27 @@ const MIGRATIONS_DIR = join(__dirname, "../../../drizzle");
 //   4. All test files that import from this helper remain unchanged
 // =============================================================================
 
-const MIGRATION_FILES = [
-  "0000_initial_schema.sql",
-  "0001_add_bank_account_tables.sql",
-];
+/**
+ * Every migration, in order. Read from disk rather than listed by hand: a
+ * hardcoded list silently omits new migrations, and the tests then run against
+ * a schema that no longer matches the app. Drizzle's numeric filename prefixes
+ * sort correctly as strings.
+ */
+function migrationFiles(): string[] {
+  return readdirSync(MIGRATIONS_DIR)
+    .filter((file) => file.endsWith(".sql"))
+    .sort();
+}
 
 function loadStatements(): string[] {
-  return MIGRATION_FILES.flatMap((file) => {
+  return migrationFiles().flatMap((file) => {
     const sql = readFileSync(join(MIGRATIONS_DIR, file), "utf-8");
     return sql
       .split("--> statement-breakpoint")
       .map((s) => s.trim())
-      .filter(Boolean);
+      // Strip comment-only fragments; `--` comments would otherwise swallow
+      // the statement they precede once newlines are normalised.
+      .filter((s) => s && !s.split("\n").every((line) => line.trim().startsWith("--")));
   });
 }
 

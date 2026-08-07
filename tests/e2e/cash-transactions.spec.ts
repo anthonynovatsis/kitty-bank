@@ -76,6 +76,52 @@ test.describe("cash transactions — auto-approved user", () => {
     );
   });
 
+  test("the date field defaults to today", async ({ page }) => {
+    await openAccount(page, SOURCE);
+    const today = new Date();
+    const expected = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    await expect(
+      page.locator('[data-testid="transaction-date-input"]'),
+    ).toHaveValue(expected);
+  });
+
+  test("a back-dated deposit records the date given, not today", async ({
+    page,
+  }) => {
+    await openAccount(page, SOURCE);
+    const before = await readBalance(page);
+
+    await submitTransaction(page, {
+      mode: "deposit",
+      amount: 60,
+      description: "E2E backdated",
+      date: "2025-03-14",
+    });
+
+    await expect(page.locator('[data-testid="transaction-result"]')).toHaveText(
+      "Transaction completed.",
+    );
+    await expect
+      .poll(() => readBalance(page))
+      .toBe(Number((before + 60).toFixed(2)));
+
+    // The row carries the chosen date rather than today's.
+    const row = page
+      .locator('[data-testid="transaction-row"]', { hasText: "E2E backdated" })
+      .first();
+    await expect(row.locator('[data-testid="transaction-date"]')).toContainText(
+      "2025",
+    );
+  });
+
+  test("the date field rejects a future date", async ({ page }) => {
+    await openAccount(page, SOURCE);
+    // The input caps itself at today, so a future value cannot be submitted.
+    await expect(
+      page.locator('[data-testid="transaction-date-input"]'),
+    ).toHaveAttribute("max", /\d{4}-\d{2}-\d{2}/);
+  });
+
   test("a withdrawal debits the balance", async ({ page }) => {
     await openAccount(page, SOURCE);
     const before = await readBalance(page);

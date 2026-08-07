@@ -30,6 +30,24 @@ const amountSchema = z
 
 const descriptionSchema = z.string().trim().max(500).optional();
 
+/**
+ * When the money actually moved. Optional — omitted means now.
+ *
+ * Back-dating is the point: users record transactions that already happened.
+ * Forward-dating is rejected, because a completed transaction that settles the
+ * balance today cannot be dated to something that has not occurred yet.
+ *
+ * The bound is checked per-parse rather than via `.max(new Date())`, which
+ * would freeze "now" at module load and start rejecting valid dates.
+ */
+const transactionDateSchema = z
+  .date()
+  .refine(
+    (date) => date.getTime() <= Date.now(),
+    "Transaction date cannot be in the future",
+  )
+  .optional();
+
 /** Load a cash account, asserting the caller owns it. */
 async function loadOwnAccount(
   tx: Transaction,
@@ -160,6 +178,7 @@ export const userRouter = createTRPCRouter({
           accountId: z.string(),
           amount: amountSchema,
           description: descriptionSchema,
+          transactionDate: transactionDateSchema,
         }),
       )
       .mutation(({ ctx, input }) =>
@@ -176,6 +195,7 @@ export const userRouter = createTRPCRouter({
             toAccountId: input.accountId,
             amount: input.amount,
             description: input.description,
+            transactionDate: input.transactionDate,
             userId,
           });
         }),
@@ -188,6 +208,7 @@ export const userRouter = createTRPCRouter({
           accountId: z.string(),
           amount: amountSchema,
           description: descriptionSchema,
+          transactionDate: transactionDateSchema,
         }),
       )
       .mutation(({ ctx, input }) =>
@@ -208,6 +229,7 @@ export const userRouter = createTRPCRouter({
             toAccountId: null,
             amount: input.amount,
             description: input.description,
+            transactionDate: input.transactionDate,
             userId,
           });
         }),
@@ -221,6 +243,7 @@ export const userRouter = createTRPCRouter({
           toAccountId: z.string(),
           amount: amountSchema,
           description: descriptionSchema,
+          transactionDate: transactionDateSchema,
         }),
       )
       .mutation(({ ctx, input }) => {
@@ -251,6 +274,7 @@ export const userRouter = createTRPCRouter({
             toAccountId: input.toAccountId,
             amount: input.amount,
             description: input.description,
+            transactionDate: input.transactionDate,
             userId,
           });
         });
@@ -289,7 +313,12 @@ export const userRouter = createTRPCRouter({
             eq(cashTransactions.fromAccountId, input.accountId),
             eq(cashTransactions.toAccountId, input.accountId),
           ),
-          orderBy: [desc(cashTransactions.createdAt)],
+          // Back-dated rows must slot into the right chronological
+          // position; createdAt only breaks ties within a day.
+          orderBy: [
+            desc(cashTransactions.transactionDate),
+            desc(cashTransactions.createdAt),
+          ],
           limit: input.limit,
         });
 
@@ -348,6 +377,8 @@ async function submitCashTransaction(
     toAccountId: string | null;
     amount: number;
     description?: string;
+    /** When the money moved. Defaults to now for a transaction happening today. */
+    transactionDate?: Date;
     userId: string;
   },
 ) {
@@ -361,6 +392,7 @@ async function submitCashTransaction(
       transactionType: input.transactionType,
       amount,
       description: input.description ?? null,
+      transactionDate: input.transactionDate ?? new Date(),
       fromAccountId: input.fromAccountId,
       toAccountId: input.toAccountId,
       // Auto-approved transactions skip `pending` entirely and leave

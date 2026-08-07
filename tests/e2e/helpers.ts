@@ -161,10 +161,16 @@ export async function submitTransaction(
     amount: number;
     description?: string;
     targetAccountName?: string;
+    /** `YYYY-MM-DD`. Omitted leaves the field on its default of today. */
+    date?: string;
   },
 ) {
   await page.click(`[data-testid="mode-${opts.mode}"]`);
   await page.fill('[data-testid="amount-input"]', String(opts.amount));
+
+  if (opts.date) {
+    await page.fill('[data-testid="transaction-date-input"]', opts.date);
+  }
 
   if (opts.description) {
     await page.fill('[data-testid="description-input"]', opts.description);

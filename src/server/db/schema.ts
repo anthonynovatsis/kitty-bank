@@ -290,6 +290,10 @@ export const cashTransactions = sqliteTable(
       .$type<"deposit" | "withdrawal" | "transfer" | "interest" | "fee">(),
     amount: d.real().notNull(),
     description: d.text(),
+    // When the money actually moved, which may predate the row: users record
+    // historical transactions. `createdAt` remains the audit trail of when the
+    // row was entered. Mirrors investment_transactions.transaction_date.
+    transactionDate: d.integer({ mode: "timestamp" }).notNull(),
     fromAccountId: d.text({ length: 255 }).references(() => cashAccounts.id),
     toAccountId: d.text({ length: 255 }).references(() => cashAccounts.id),
     status: d
@@ -312,6 +316,7 @@ export const cashTransactions = sqliteTable(
     index("cash_transactions_account_id_idx").on(t.cashAccountId),
     index("cash_transactions_status_idx").on(t.status),
     index("cash_transactions_created_by_idx").on(t.createdByUserId),
+    index("cash_transactions_transaction_date_idx").on(t.transactionDate),
   ],
 );
 

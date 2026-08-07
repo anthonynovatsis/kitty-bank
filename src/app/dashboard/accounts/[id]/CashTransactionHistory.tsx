@@ -51,8 +51,11 @@ export function CashTransactionHistory({ accountId }: { accountId: string }) {
             <tbody className="divide-y divide-gray-100">
               {data.map((transaction) => (
                 <tr key={transaction.id} data-testid="transaction-row">
-                  <td className="py-3 pr-4 text-gray-600">
-                    {transaction.createdAt.toLocaleDateString()}
+                  <td
+                    data-testid="transaction-date"
+                    className="py-3 pr-4 text-gray-600"
+                  >
+                    {transaction.transactionDate.toLocaleDateString()}
                   </td>
                   <td
                     data-testid="transaction-type"
