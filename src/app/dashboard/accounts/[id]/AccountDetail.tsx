@@ -30,7 +30,7 @@ export function AccountDetail({ accountId }: { accountId: string }) {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto p-6">
+      <div>
         <div className="text-muted-foreground animate-pulse">
           Loading account...
         </div>
@@ -40,7 +40,7 @@ export function AccountDetail({ accountId }: { accountId: string }) {
 
   if (error) {
     return (
-      <div className="container mx-auto p-6">
+      <div>
         <div className="bg-tone-danger rounded-lg p-4">
           <p className="text-tone-danger-foreground">
             {error.data?.code === "NOT_FOUND"
@@ -61,7 +61,7 @@ export function AccountDetail({ accountId }: { accountId: string }) {
   if (!data) return null;
 
   return (
-    <div className="container mx-auto p-6">
+    <div>
       <div className="mb-6">
         <Link
           data-testid="back-to-dashboard"

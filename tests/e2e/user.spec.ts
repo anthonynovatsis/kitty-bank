@@ -9,7 +9,7 @@ test.describe("dashboard — regular user", () => {
   test("dashboard loads and shows welcome message", async ({ page }) => {
     await page.goto("/dashboard");
     await expect(page).toHaveURL(/\/dashboard/);
-    await expect(page.locator("text=Kitty Bank Dashboard")).toBeVisible();
+    await expect(page.locator('[data-testid="app-brand"]')).toBeVisible();
     await expect(page.locator(`text=Welcome, ${USER.name}`)).toBeVisible();
   });
 
@@ -51,7 +51,7 @@ test.describe("dashboard — admin user", () => {
   test("admin user can also access their dashboard", async ({ page }) => {
     await page.goto("/dashboard");
     await expect(page).toHaveURL(/\/dashboard/);
-    await expect(page.locator("text=Kitty Bank Dashboard")).toBeVisible();
+    await expect(page.locator('[data-testid="app-brand"]')).toBeVisible();
   });
 
   test("admin user can navigate to /admin from dashboard", async ({ page }) => {

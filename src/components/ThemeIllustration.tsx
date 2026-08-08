@@ -1,4 +1,10 @@
-import { ArrowLeftRight, ChartCandlestick, Inbox, Wallet } from "lucide-react";
+import {
+  ArrowLeftRight,
+  ChartCandlestick,
+  Inbox,
+  Landmark,
+  Wallet,
+} from "lucide-react";
 import { cn } from "~/lib/utils";
 
 /**
@@ -21,6 +27,7 @@ import { cn } from "~/lib/utils";
  */
 
 export type IllustrationName =
+  | "brand"
   | "empty-accounts"
   | "empty-transactions"
   | "empty-holdings"
@@ -31,6 +38,7 @@ export type IllustrationName =
  * calls for "minimal / none" here, and restraint is the point of the theme.
  */
 const DEFAULT_ART: Record<IllustrationName, React.ReactNode> = {
+  brand: <Landmark className="text-primary size-full" strokeWidth={1.5} />,
   "empty-accounts": <Wallet className="size-full" strokeWidth={1.25} />,
   "empty-transactions": <Inbox className="size-full" strokeWidth={1.25} />,
   "empty-holdings": (
@@ -89,6 +97,19 @@ function KittenHead({ asleep = false }: { asleep?: boolean }) {
 }
 
 const KITTEN_ART: Record<IllustrationName, React.ReactNode> = {
+  // The brand mark: just the face, sized to sit beside the wordmark.
+  brand: (
+    <svg viewBox="0 0 64 64" className="size-full">
+      <KittenHead />
+      <path
+        d="M12 34 h-6 M12 38 h-6 M52 34 h6 M52 38 h6"
+        className="stroke-primary/50"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+    </svg>
+  ),
+
   // Curled up asleep — nothing here yet, so the cat is resting.
   "empty-accounts": (
     <svg viewBox="0 0 64 64" className="size-full">

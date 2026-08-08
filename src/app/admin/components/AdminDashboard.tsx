@@ -4,7 +4,6 @@ import { useState } from "react";
 import { api } from "~/trpc/react";
 import { StatusBadge, statusTone } from "~/components/StatusBadge";
 import { Button } from "~/components/ui/button";
-import { ThemeSwitcher } from "~/components/ThemeSwitcher";
 import { CreateAccountDialog } from "./CreateAccountDialog";
 import { PendingTransactions } from "./PendingTransactions";
 import { EmptyState } from "~/components/ThemeIllustration";
@@ -43,28 +42,21 @@ export function AdminDashboard() {
   };
 
   if (accountsLoading || usersLoading) {
-    return (
-      <div className="container mx-auto p-6">
-        <div className="text-center">Loading...</div>
-      </div>
-    );
+    return <div className="text-muted-foreground text-center">Loading...</div>;
   }
 
   const { cashAccounts = [], investmentAccounts = [] } = accountsData ?? {};
 
   return (
-    <div className="container mx-auto p-6">
+    <div>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-3xl font-bold">Account Management</h1>
-        <div className="flex items-center gap-3">
-          <ThemeSwitcher />
-          <Button
-            data-testid="create-account-open"
-            onClick={() => setShowCreateDialog(true)}
-          >
-            Create Account
-          </Button>
-        </div>
+        <Button
+          data-testid="create-account-open"
+          onClick={() => setShowCreateDialog(true)}
+        >
+          Create Account
+        </Button>
       </div>
 
       {/* Tabs */}
@@ -167,11 +159,6 @@ export function AdminDashboard() {
                     </div>
                   </div>
                 ))}
-                {cashAccounts.length === 0 && (
-                  <p className="text-muted-foreground">
-                    No cash accounts found
-                  </p>
-                )}
               </div>
             </div>
 
@@ -201,11 +188,6 @@ export function AdminDashboard() {
                     </div>
                   </div>
                 ))}
-                {investmentAccounts.length === 0 && (
-                  <p className="text-muted-foreground">
-                    No investment accounts found
-                  </p>
-                )}
               </div>
             </div>
           </div>
