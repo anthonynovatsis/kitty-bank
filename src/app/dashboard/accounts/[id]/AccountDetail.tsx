@@ -5,6 +5,7 @@ import { api } from "~/trpc/react";
 import { StatusBadge, statusTone } from "~/components/StatusBadge";
 import { CashTransactionForms } from "./CashTransactionForms";
 import { CashTransactionHistory } from "./CashTransactionHistory";
+import { EmptyState } from "~/components/ThemeIllustration";
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("en-US", {
@@ -191,7 +192,9 @@ function InvestmentAccountDetail({ account }: { account: InvestmentAccount }) {
       >
         <h2 className="text-foreground mb-4 text-lg font-semibold">Holdings</h2>
         {account.holdings.length === 0 ? (
-          <p className="text-muted-foreground">No holdings yet.</p>
+          <EmptyState illustration="empty-holdings">
+            No holdings yet.
+          </EmptyState>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

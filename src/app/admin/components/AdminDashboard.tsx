@@ -7,6 +7,7 @@ import { Button } from "~/components/ui/button";
 import { ThemeSwitcher } from "~/components/ThemeSwitcher";
 import { CreateAccountDialog } from "./CreateAccountDialog";
 import { PendingTransactions } from "./PendingTransactions";
+import { EmptyState } from "~/components/ThemeIllustration";
 
 export function AdminDashboard() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -216,7 +217,9 @@ export function AdminDashboard() {
         <div className="bg-card rounded-lg p-6 shadow">
           <h3 className="mb-4 text-lg font-medium">Cash Accounts</h3>
           {cashAccounts.length === 0 ? (
-            <p className="text-muted-foreground">No cash accounts found</p>
+            <EmptyState illustration="empty-accounts">
+              No cash accounts found
+            </EmptyState>
           ) : (
             <div className="space-y-2">
               {cashAccounts.map((account) => (
@@ -254,9 +257,9 @@ export function AdminDashboard() {
         <div className="bg-card rounded-lg p-6 shadow">
           <h3 className="mb-4 text-lg font-medium">Investment Accounts</h3>
           {investmentAccounts.length === 0 ? (
-            <p className="text-muted-foreground">
+            <EmptyState illustration="empty-holdings">
               No investment accounts found
-            </p>
+            </EmptyState>
           ) : (
             <div className="space-y-2">
               {investmentAccounts.map((account) => (

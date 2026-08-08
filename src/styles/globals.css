@@ -286,6 +286,23 @@
   --tone-accent-foreground: oklch(89% 0.06 320);
 }
 
+/*
+ * Which theme's illustration is visible.
+ *
+ * ThemeIllustration renders every variant and this picks one, so no component
+ * has to know the active theme — the same rule the palettes follow. A new
+ * theme adds a pair here; a theme with no art of its own simply omits itself
+ * and inherits nothing, leaving the slot empty.
+ */
+[data-theme-art] {
+  display: none;
+}
+
+[data-theme="default"] [data-theme-art="default"],
+[data-theme="kitten"] [data-theme-art="kitten"] {
+  display: block;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

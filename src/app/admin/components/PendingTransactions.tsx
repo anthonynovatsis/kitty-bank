@@ -4,6 +4,7 @@ import { useState } from "react";
 import { api } from "~/trpc/react";
 import { StatusBadge } from "~/components/StatusBadge";
 import { Button } from "~/components/ui/button";
+import { EmptyState } from "~/components/ThemeIllustration";
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("en-US", {
@@ -65,12 +66,12 @@ export function PendingTransactions() {
       )}
 
       {transactions.length === 0 ? (
-        <p
-          data-testid="no-pending-transactions"
-          className="text-muted-foreground"
+        <EmptyState
+          illustration="empty-transactions"
+          testId="no-pending-transactions"
         >
           No transactions awaiting approval.
-        </p>
+        </EmptyState>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">

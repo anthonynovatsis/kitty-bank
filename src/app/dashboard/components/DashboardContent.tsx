@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { api } from "~/trpc/react";
 import { StatusBadge } from "~/components/StatusBadge";
+import { EmptyState } from "~/components/ThemeIllustration";
 
 export function DashboardContent() {
   const {
@@ -101,10 +102,10 @@ export function DashboardContent() {
         {/* No Accounts Message */}
         {!accounts?.cashAccounts.length &&
           !accounts?.investmentAccounts.length && (
-            <div className="bg-muted col-span-full rounded-lg p-8 text-center">
-              <p className="text-muted-foreground">
+            <div className="bg-muted col-span-full rounded-lg">
+              <EmptyState illustration="empty-accounts">
                 No accounts yet. Contact your administrator to create accounts.
-              </p>
+              </EmptyState>
             </div>
           )}
       </div>

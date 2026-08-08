@@ -1,6 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { USER_AUTH_FILE } from "../../playwright.config";
-import { chooseOption } from "./helpers";
+import { chooseOption, signUpFreshUser } from "./helpers";
 
 test.use({ storageState: USER_AUTH_FILE });
 
@@ -86,5 +86,46 @@ test.describe("theming", () => {
 
     await page.goto("/dashboard");
     await expect(page.locator("html")).toHaveAttribute("data-theme", "default");
+  });
+
+  // Uses a throwaway signup because the seeded user accumulates accounts as
+  // other specs create fixtures, and an empty state needs an empty account list.
+  test("empty-state art follows the theme", async ({ browser }) => {
+    const { context, page } = await signUpFreshUser(browser);
+    try {
+      const defaultArt = page.locator('[data-theme-art="default"]').first();
+      const kittenArt = page.locator('[data-theme-art="kitten"]').first();
+
+      await expect(defaultArt).toBeVisible();
+      await expect(kittenArt).toBeHidden();
+
+      await chooseOption(page, "theme-select", "kitten");
+
+      await expect(kittenArt).toBeVisible();
+      await expect(defaultArt).toBeHidden();
+
+      // The art takes its colour from the palette rather than a literal, so it
+      // must resolve to the theme's primary rather than to some fixed pink.
+      const [artFill, themePrimary] = await Promise.all([
+        kittenArt
+          .locator("circle")
+          .first()
+          .evaluate((el) => getComputedStyle(el).fill),
+        // Resolved through a real property, not read raw: the custom property
+        // serialises as "oklch(66% …)" while a computed fill normalises to
+        // "oklch(0.66 …)", and the two would never compare equal.
+        page.evaluate(() => {
+          const probe = document.createElement("span");
+          probe.style.color = "var(--primary)";
+          document.body.append(probe);
+          const resolved = getComputedStyle(probe).color;
+          probe.remove();
+          return resolved;
+        }),
+      ]);
+      expect(artFill).toBe(themePrimary);
+    } finally {
+      await context.close();
+    }
   });
 });
