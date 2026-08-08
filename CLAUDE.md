@@ -112,3 +112,9 @@ phase status. The project is building a banking app with:
 Phases 1 through 2C are complete (accounts, user management, cash transactions).
 Phase 3 — investment transactions, holdings, buy/sell — is next and will need
 its own service module alongside `cash.ts`.
+
+`plans/ui_theming_plan.md` covers the parallel UI track: adopting shadcn/ui and
+rebuilding the styling on semantic CSS variables so themes (a playful "Kitten"
+theme, a "Serious" theme) are a block of variables rather than an edit to every
+file. Colour belongs in tokens — no literal palette classes (`bg-blue-600`) in
+`src/app/`.
