@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { api } from "~/trpc/react";
 import { StatusBadge } from "~/components/StatusBadge";
+import { Button } from "~/components/ui/button";
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("en-US", {
@@ -148,7 +149,8 @@ export function PendingTransactions() {
                     </td>
                     <td className="py-3">
                       <div className="flex gap-2">
-                        <button
+                        <Button
+                          size="sm"
                           data-testid="approve-button"
                           disabled={isDeciding}
                           onClick={() =>
@@ -157,11 +159,12 @@ export function PendingTransactions() {
                               action: "approve",
                             })
                           }
-                          className="rounded-md bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50"
                         >
                           Approve
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
                           data-testid="reject-button"
                           disabled={isDeciding}
                           onClick={() =>
@@ -170,10 +173,9 @@ export function PendingTransactions() {
                               action: "reject",
                             })
                           }
-                          className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                         >
                           Reject
-                        </button>
+                        </Button>
                       </div>
                     </td>
                   </tr>

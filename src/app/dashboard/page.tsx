@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { getSession } from "~/server/better-auth/server";
 import { auth } from "~/server/better-auth";
+import { Button } from "~/components/ui/button";
 import { DashboardContent } from "./components/DashboardContent";
 
 export default async function Dashboard() {
@@ -24,8 +25,12 @@ export default async function Dashboard() {
                 Welcome, {session.user?.name || session.user?.email}
               </span>
               <form>
-                <button
-                  className="rounded-md bg-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300"
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  // Base UI's Button defaults to type="button", which silently
+                  // disables formAction. The server action needs a submit.
+                  type="submit"
                   formAction={async () => {
                     "use server";
                     await auth.api.signOut({
@@ -35,7 +40,7 @@ export default async function Dashboard() {
                   }}
                 >
                   Sign out
-                </button>
+                </Button>
               </form>
             </div>
           </div>

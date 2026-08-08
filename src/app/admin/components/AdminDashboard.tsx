@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { api } from "~/trpc/react";
 import { StatusBadge, statusTone } from "~/components/StatusBadge";
+import { Button } from "~/components/ui/button";
 import { CreateAccountDialog } from "./CreateAccountDialog";
 import { PendingTransactions } from "./PendingTransactions";
 
@@ -53,13 +54,12 @@ export function AdminDashboard() {
     <div className="container mx-auto p-6">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-3xl font-bold">Account Management</h1>
-        <button
+        <Button
           data-testid="create-account-open"
           onClick={() => setShowCreateDialog(true)}
-          className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700"
         >
           Create Account
-        </button>
+        </Button>
       </div>
 
       {/* Tabs */}

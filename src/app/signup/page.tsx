@@ -4,6 +4,9 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { authClient } from "~/server/better-auth/client";
+import { Button } from "~/components/ui/button";
+import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
 
 export default function SignUp() {
   const router = useRouter();
@@ -101,14 +104,9 @@ export default function SignUp() {
         <div className="bg-white px-4 py-8 shadow sm:rounded-lg sm:px-10">
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div>
-              <label
-                htmlFor="name"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Name
-              </label>
+              <Label htmlFor="name">Name</Label>
               <div className="mt-1">
-                <input
+                <Input
                   id="name"
                   name="name"
                   type="text"
@@ -116,20 +114,14 @@ export default function SignUp() {
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 focus:outline-none sm:text-sm"
                 />
               </div>
             </div>
 
             <div>
-              <label
-                htmlFor="email"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Email address
-              </label>
+              <Label htmlFor="email">Email address</Label>
               <div className="mt-1">
-                <input
+                <Input
                   id="email"
                   name="email"
                   type="email"
@@ -137,20 +129,14 @@ export default function SignUp() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 focus:outline-none sm:text-sm"
                 />
               </div>
             </div>
 
             <div>
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Password
-              </label>
+              <Label htmlFor="password">Password</Label>
               <div className="mt-1">
-                <input
+                <Input
                   id="password"
                   name="password"
                   type="password"
@@ -158,20 +144,14 @@ export default function SignUp() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 focus:outline-none sm:text-sm"
                 />
               </div>
             </div>
 
             <div>
-              <label
-                htmlFor="confirm-password"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Confirm Password
-              </label>
+              <Label htmlFor="confirm-password">Confirm Password</Label>
               <div className="mt-1">
-                <input
+                <Input
                   id="confirm-password"
                   name="confirm-password"
                   type="password"
@@ -179,7 +159,6 @@ export default function SignUp() {
                   required
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 focus:outline-none sm:text-sm"
                 />
               </div>
             </div>
@@ -191,13 +170,9 @@ export default function SignUp() {
             )}
 
             <div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="flex w-full justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-              >
+              <Button type="submit" disabled={loading} className="w-full">
                 {loading ? "Creating account..." : "Create account"}
-              </button>
+              </Button>
             </div>
           </form>
         </div>
