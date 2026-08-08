@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { api } from "~/trpc/react";
 import { StatusBadge } from "~/components/StatusBadge";
-import { EmptyState } from "~/components/ThemeIllustration";
+import { EmptyState, ThemeIllustration } from "~/components/ThemeIllustration";
 import { CardGridSkeleton } from "~/components/Skeletons";
 
 export function DashboardContent() {
@@ -63,10 +63,20 @@ export function DashboardContent() {
             href={`/dashboard/accounts/${account.id}`}
             className="bg-card block rounded-lg p-6 shadow transition-shadow hover:shadow-md"
           >
-            <div className="flex items-center justify-between">
-              <h3 className="text-foreground font-medium">
-                {account.accountName}
-              </h3>
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <ThemeIllustration
+                  name={
+                    account.accountType === "savings"
+                      ? "account-savings"
+                      : "account-checking"
+                  }
+                  className="size-9"
+                />
+                <h3 className="text-foreground truncate font-medium">
+                  {account.accountName}
+                </h3>
+              </div>
               <StatusBadge tone="info">{account.accountType}</StatusBadge>
             </div>
             <p className="text-foreground mt-2 text-2xl font-bold">
@@ -85,10 +95,16 @@ export function DashboardContent() {
             href={`/dashboard/accounts/${account.id}`}
             className="bg-card block rounded-lg p-6 shadow transition-shadow hover:shadow-md"
           >
-            <div className="flex items-center justify-between">
-              <h3 className="text-foreground font-medium">
-                {account.accountName}
-              </h3>
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <ThemeIllustration
+                  name="account-investment"
+                  className="size-9"
+                />
+                <h3 className="text-foreground truncate font-medium">
+                  {account.accountName}
+                </h3>
+              </div>
               <StatusBadge tone="accent">investment</StatusBadge>
             </div>
             <p className="text-foreground mt-2 text-2xl font-bold">

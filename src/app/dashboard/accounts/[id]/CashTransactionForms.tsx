@@ -5,6 +5,7 @@ import { api } from "~/trpc/react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import { ThemeIllustration } from "~/components/ThemeIllustration";
 import {
   Select,
   SelectContent,
@@ -280,8 +281,14 @@ export function CashTransactionForms({
       {result && (
         <p
           data-testid="transaction-result"
-          className="bg-tone-positive text-tone-positive-foreground mt-4 rounded-md p-3 text-sm"
+          className="bg-tone-positive text-tone-positive-foreground mt-4 flex items-center gap-2 rounded-md p-3 text-sm"
         >
+          {/* text-current so the mark takes the message bar's colour, not the
+              wrapper's default muted tone. */}
+          <ThemeIllustration
+            name="success"
+            className="size-6 shrink-0 text-current"
+          />
           {result}
         </p>
       )}

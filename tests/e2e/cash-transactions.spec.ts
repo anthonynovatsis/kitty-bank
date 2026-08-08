@@ -53,9 +53,25 @@ test.describe("cash transactions — auto-approved user", () => {
       description: "E2E deposit",
     });
 
-    await expect(page.locator('[data-testid="transaction-result"]')).toHaveText(
-      "Transaction completed.",
-    );
+    const result = page.locator('[data-testid="transaction-result"]');
+    await expect(result).toHaveText("Transaction completed.");
+
+    // The mark inherits the bar's colour rather than the illustration
+    // wrapper's default muted tone — otherwise the Kitten theme puts a pink cat
+    // on a green strip. Compared on `color`, not `fill`: the default theme's
+    // mark is a stroke icon whose fill is "none", and both themes' art draws
+    // itself from currentColor either way.
+    //
+    // :visible matters — ThemeIllustration keeps every theme's art in the DOM
+    // and hides all but one, so a bare "svg" matches more than one element.
+    const [markColour, barColour] = await Promise.all([
+      result
+        .locator("[data-theme-art]:visible svg")
+        .evaluate((el) => getComputedStyle(el).color),
+      result.evaluate((el) => getComputedStyle(el).color),
+    ]);
+    expect(markColour).toBe(barColour);
+
     await expect
       .poll(() => readBalance(page))
       .toBe(Number((before + 500).toFixed(2)));

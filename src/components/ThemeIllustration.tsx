@@ -1,8 +1,10 @@
 import {
-  ArrowLeftRight,
+  Banknote,
   ChartCandlestick,
+  CircleCheck,
   Inbox,
   Landmark,
+  PiggyBank,
   Wallet,
 } from "lucide-react";
 import { cn } from "~/lib/utils";
@@ -31,7 +33,10 @@ export type IllustrationName =
   | "empty-accounts"
   | "empty-transactions"
   | "empty-holdings"
-  | "empty-transfer";
+  | "success"
+  | "account-checking"
+  | "account-savings"
+  | "account-investment";
 
 /*
  * Default theme: lucide, which is already the app's icon language. The plan
@@ -44,7 +49,12 @@ const DEFAULT_ART: Record<IllustrationName, React.ReactNode> = {
   "empty-holdings": (
     <ChartCandlestick className="size-full" strokeWidth={1.25} />
   ),
-  "empty-transfer": <ArrowLeftRight className="size-full" strokeWidth={1.25} />,
+  success: <CircleCheck className="size-full" strokeWidth={1.75} />,
+  "account-checking": <Banknote className="size-full" strokeWidth={1.5} />,
+  "account-savings": <PiggyBank className="size-full" strokeWidth={1.5} />,
+  "account-investment": (
+    <ChartCandlestick className="size-full" strokeWidth={1.5} />
+  ),
 };
 
 /*
@@ -173,23 +183,85 @@ const KITTEN_ART: Record<IllustrationName, React.ReactNode> = {
     </svg>
   ),
 
-  // Two paw prints, going nowhere: there is no second account to transfer to.
-  "empty-transfer": (
-    <svg viewBox="0 0 64 64" className="size-full">
-      {[16, 40].map((x) => (
-        <g key={x} transform={`translate(${x} 24)`}>
-          <ellipse cx="4" cy="10" rx="7" ry="5.5" className="fill-primary" />
-          <circle cx="-2" cy="2" r="2.4" className="fill-primary/70" />
-          <circle cx="3" cy="0" r="2.4" className="fill-primary/70" />
-          <circle cx="8" cy="1.5" r="2.4" className="fill-primary/70" />
-        </g>
-      ))}
+  /*
+   * A pleased face, in currentColor rather than the palette.
+   *
+   * Every other mark sits on a neutral surface and can use fill-primary. This
+   * one sits inside the positive-tone message bar, where a pink cat on a green
+   * strip is two unrelated colours arguing. Inheriting the bar's own text
+   * colour is the whole reason single-tone marks are worth keeping simple.
+   */
+  success: (
+    <svg viewBox="0 0 64 64" className="size-full" fill="currentColor">
+      <path d="M15 26 L18 10 L30 19 Z" />
+      <path d="M49 26 L46 10 L34 19 Z" />
+      <circle cx="32" cy="34" r="18" />
       <path
-        d="M30 34 h4"
-        className="stroke-muted-foreground/40"
+        d="M22 32 q4 4 8 0 M34 32 q4 4 8 0"
+        stroke="currentColor"
         strokeWidth="2"
         strokeLinecap="round"
+        fill="none"
+        className="text-tone-positive"
       />
+      <path d="M30.5 38 L33.5 38 L32 40.5 Z" className="text-tone-positive" />
+    </svg>
+  ),
+
+  /*
+   * Account-card marks. At this size the head alone is the only thing that
+   * survives, so the type is carried by what sits beside it rather than by a
+   * different cat.
+   */
+  "account-checking": (
+    <svg viewBox="0 0 64 64" className="size-full">
+      <rect
+        x="8"
+        y="38"
+        width="48"
+        height="18"
+        rx="4"
+        className="fill-accent"
+      />
+      <g transform="translate(0 -8) scale(0.68) translate(15 6)">
+        <KittenHead />
+      </g>
+    </svg>
+  ),
+  "account-savings": (
+    <svg viewBox="0 0 64 64" className="size-full">
+      <circle cx="32" cy="44" r="16" className="fill-tone-warning" />
+      <path
+        d="M26 44 h12"
+        className="stroke-tone-warning-foreground/50"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
+      <g transform="translate(0 -10) scale(0.6) translate(21 4)">
+        <KittenHead />
+      </g>
+    </svg>
+  ),
+  "account-investment": (
+    <svg viewBox="0 0 64 64" className="size-full">
+      <path
+        d="M10 50 L24 36 L34 44 L54 22"
+        className="stroke-primary"
+        strokeWidth="4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+      <path
+        d="M44 22 h10 v10"
+        className="stroke-primary fill-none"
+        strokeWidth="4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <g transform="translate(-14 6) scale(0.5) translate(6 6)">
+        <KittenHead />
+      </g>
     </svg>
   ),
 };
