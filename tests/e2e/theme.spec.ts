@@ -31,14 +31,14 @@ test.describe("theming", () => {
 
   test("the choice survives a reload", async ({ page }) => {
     await page.goto("/dashboard");
-    await chooseOption(page, "theme-select", "serious");
-    await expect(page.locator("html")).toHaveAttribute("data-theme", "serious");
+    await chooseOption(page, "theme-select", "kitten");
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "kitten");
 
     await page.reload();
 
     // Served correct rather than corrected on load: the cookie is read during
     // render, so there is no window in which the wrong theme is on screen.
-    await expect(page.locator("html")).toHaveAttribute("data-theme", "serious");
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "kitten");
   });
 
   test("dark mode toggles and persists", async ({ page }) => {
@@ -63,8 +63,8 @@ test.describe("theming", () => {
     await expect(html).toHaveClass(/dark/);
 
     // Changing one must not reset the other.
-    await chooseOption(page, "theme-select", "serious");
-    await expect(html).toHaveAttribute("data-theme", "serious");
+    await chooseOption(page, "theme-select", "default");
+    await expect(html).toHaveAttribute("data-theme", "default");
     await expect(html).toHaveClass(/dark/);
   });
 

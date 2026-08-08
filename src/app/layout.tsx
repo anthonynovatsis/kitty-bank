@@ -1,7 +1,7 @@
 import "~/styles/globals.css";
 
 import { type Metadata } from "next";
-import { Geist, IBM_Plex_Sans, Nunito } from "next/font/google";
+import { IBM_Plex_Sans, Nunito } from "next/font/google";
 import { cookies } from "next/headers";
 
 import { TRPCReactProvider } from "~/trpc/react";
@@ -21,8 +21,6 @@ export const metadata: Metadata = {
  * theme blocks in globals.css decide which one --theme-font-sans points at, so
  * switching theme changes typeface without fetching anything new.
  */
-const geist = Geist({ subsets: ["latin"], variable: "--font-geist-sans" });
-
 const nunito = Nunito({ subsets: ["latin"], variable: "--font-nunito" });
 
 const plexSans = IBM_Plex_Sans({
@@ -40,7 +38,7 @@ export default async function RootLayout({
   const theme = parseTheme(cookieStore.get(THEME_COOKIE)?.value);
   const mode = parseMode(cookieStore.get(MODE_COOKIE)?.value);
 
-  const fontVariables = `${geist.variable} ${nunito.variable} ${plexSans.variable}`;
+  const fontVariables = `${plexSans.variable} ${nunito.variable}`;
 
   return (
     <html

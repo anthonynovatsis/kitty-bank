@@ -10,9 +10,8 @@
  */
 
 export const THEMES = [
-  { id: "default", label: "Default", hint: "Clean and neutral" },
+  { id: "default", label: "Default", hint: "Crisp and businesslike" },
   { id: "kitten", label: "Kitten", hint: "Soft, warm and playful" },
-  { id: "serious", label: "Serious", hint: "Dense and businesslike" },
 ] as const;
 
 export type ThemeId = (typeof THEMES)[number]["id"];

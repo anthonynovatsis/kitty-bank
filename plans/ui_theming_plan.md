@@ -246,14 +246,18 @@ fight the dark variant.
 
 ### Phase T6: Theme designs — palettes done in T4 ✅, Terminal outstanding
 
-| | Kitten | Serious | Terminal |
+| | Default | Kitten | Terminal |
 |---|---|---|---|
-| Primary | warm pink / peach | deep navy | amber on near-black |
-| Radius | `1rem` | `0.25rem` | `0` |
-| Font | rounded (Nunito / Quicksand) | Geist / IBM Plex Sans | JetBrains Mono |
-| Numerals | proportional | tabular | tabular |
-| Feel | generous whitespace, playful | dense, professional | high contrast |
-| Illustration | cartoon kittens | minimal / none | ASCII-ish glyphs |
+| Primary | deep navy | warm pink / peach | amber on near-black |
+| Radius | `0.25rem` | `1rem` | `0` |
+| Font | IBM Plex Sans | Nunito | JetBrains Mono |
+| Numerals | tabular | proportional | tabular |
+| Feel | dense, professional | generous whitespace, playful | high contrast |
+| Illustration | minimal / none | cartoon kittens | ASCII-ish glyphs |
+
+There is no separate "Serious" theme: it *is* the default. The original default
+was only ever a copy of the pre-token palette, kept so T1 could land without a
+visual diff, and it had no reason to outlive that job.
 
 Terminal is optional — listed to prove the token set is general enough that a
 third theme costs nothing but a variable block.
