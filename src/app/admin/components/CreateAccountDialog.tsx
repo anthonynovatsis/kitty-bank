@@ -1,7 +1,26 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import { api } from "~/trpc/react";
+import { Button } from "~/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "~/components/ui/dialog";
+import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
 import { UserSearchCombobox } from "./UserSearchCombobox";
 
 interface CreateAccountDialogProps {
@@ -23,14 +42,15 @@ export function CreateAccountDialog({
   const [cashAccountType, setCashAccountType] = useState<
     "checking" | "savings" | ""
   >("");
+
   const createAccountMutation = api.admin.accounts.create.useMutation({
     onSuccess: () => {
-      alert("Account created successfully");
+      toast.success("Account created successfully");
       resetForm();
       onAccountCreated();
     },
     onError: (error) => {
-      alert(error?.message ?? "Failed to create account");
+      toast.error(error?.message ?? "Failed to create account");
     },
   });
 
@@ -45,12 +65,12 @@ export function CreateAccountDialog({
     e.preventDefault();
 
     if (!selectedUserId || !accountName || !accountType) {
-      alert("Please fill in all required fields");
+      toast.error("Please fill in all required fields");
       return;
     }
 
     if (accountType === "cash" && !cashAccountType) {
-      alert("Please select a cash account type");
+      toast.error("Please select a cash account type");
       return;
     }
 
@@ -69,43 +89,31 @@ export function CreateAccountDialog({
     onOpenChange(newOpen);
   };
 
-  if (!open) return null;
-
   return (
-    <div className="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black">
-      <div
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent
         data-testid="create-account-dialog"
-        className="mx-4 w-full max-w-md rounded-lg bg-white p-6"
+        className="sm:max-w-md"
       >
-        <div className="mb-4">
-          <h2 className="text-xl font-semibold">Create New Account</h2>
-          <p className="text-sm text-gray-600">
+        <DialogHeader>
+          <DialogTitle>Create New Account</DialogTitle>
+          <DialogDescription>
             Create a new cash or investment account for a user.
-          </p>
-        </div>
+          </DialogDescription>
+        </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label
-              htmlFor="user-search"
-              className="mb-1 block text-sm font-medium text-gray-700"
-            >
-              User *
-            </label>
+          <div className="space-y-1">
+            <Label htmlFor="user-search">User *</Label>
             <UserSearchCombobox
               value={selectedUserId}
               onValueChange={setSelectedUserId}
             />
           </div>
 
-          <div>
-            <label
-              htmlFor="account-name"
-              className="mb-1 block text-sm font-medium text-gray-700"
-            >
-              Account Name *
-            </label>
-            <input
+          <div className="space-y-1">
+            <Label htmlFor="account-name">Account Name *</Label>
+            <Input
               id="account-name"
               data-testid="account-name-input"
               type="text"
@@ -113,83 +121,86 @@ export function CreateAccountDialog({
               onChange={(e) => setAccountName(e.target.value)}
               placeholder="e.g., John's Checking Account"
               required
-              className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500 focus:outline-none"
             />
           </div>
 
-          <div>
-            <label
-              htmlFor="account-type"
-              className="mb-1 block text-sm font-medium text-gray-700"
-            >
-              Account Type *
-            </label>
-            <select
-              id="account-type"
-              data-testid="account-type-select"
+          <div className="space-y-1">
+            <Label htmlFor="account-type">Account Type *</Label>
+            <Select
               value={accountType}
-              onChange={(e) => {
-                const value = e.target.value as "cash" | "investment";
-                setAccountType(value);
+              onValueChange={(value) => {
+                setAccountType(value ?? "");
                 if (value === "investment") {
                   setCashAccountType("");
                 }
               }}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500 focus:outline-none"
             >
-              <option value="">Select account type</option>
-              <option value="cash">Cash Account</option>
-              <option value="investment">Investment Account</option>
-            </select>
+              <SelectTrigger
+                id="account-type"
+                data-testid="account-type-select"
+                className="w-full"
+              >
+                <SelectValue placeholder="Select account type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="cash" data-testid="option-cash">
+                  Cash Account
+                </SelectItem>
+                <SelectItem value="investment" data-testid="option-investment">
+                  Investment Account
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {accountType === "cash" && (
-            <div>
-              <label
-                htmlFor="cash-account-type"
-                className="mb-1 block text-sm font-medium text-gray-700"
-              >
-                Cash Account Type *
-              </label>
-              <select
-                id="cash-account-type"
-                data-testid="cash-account-type-select"
+            <div className="space-y-1">
+              <Label htmlFor="cash-account-type">Cash Account Type *</Label>
+              <Select
                 value={cashAccountType}
-                onChange={(e) =>
-                  setCashAccountType(e.target.value as "checking" | "savings")
-                }
-                className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                onValueChange={(value) => setCashAccountType(value ?? "")}
               >
-                <option value="">Select cash account type</option>
-                <option value="checking">Checking</option>
-                <option value="savings">Savings</option>
-              </select>
+                <SelectTrigger
+                  id="cash-account-type"
+                  data-testid="cash-account-type-select"
+                  className="w-full"
+                >
+                  <SelectValue placeholder="Select cash account type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="checking" data-testid="option-checking">
+                    Checking
+                  </SelectItem>
+                  <SelectItem value="savings" data-testid="option-savings">
+                    Savings
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           )}
 
-          <div className="mt-6 flex justify-end space-x-3">
-            <button
+          <DialogFooter className="mt-6">
+            <Button
               type="button"
+              variant="outline"
               data-testid="create-account-cancel"
               onClick={() => handleOpenChange(false)}
               disabled={createAccountMutation.isPending}
-              className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none disabled:opacity-50"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
               data-testid="create-account-submit"
               disabled={createAccountMutation.isPending}
-              className="rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none disabled:opacity-50"
             >
               {createAccountMutation.isPending
                 ? "Creating..."
                 : "Create Account"}
-            </button>
-          </div>
+            </Button>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

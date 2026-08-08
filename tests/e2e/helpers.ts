@@ -18,9 +18,22 @@ import { ADMIN_AUTH_FILE } from "../../playwright.config";
  * ---------------------------------------------------------------------------
  */
 
-/** Choose a dropdown value by its underlying value attribute. */
+/**
+ * Choose a dropdown value.
+ *
+ * A Base UI Select is a button plus a portalled popup, so this is a click on
+ * the trigger and a click on the option — `selectOption()` has nothing to act
+ * on. Options carry `option-<value>` testids because Base UI keeps the value
+ * in React state and never writes it to the DOM.
+ */
 export async function chooseOption(page: Page, testId: string, value: string) {
-  await page.selectOption(`[data-testid="${testId}"]`, value);
+  await page.click(`[data-testid="${testId}"]`);
+  // [data-open] is what narrows this to one element. Base UI keeps every
+  // select's popup mounted, and [role="listbox"] would also catch the user
+  // combobox's cmdk list, which is open at the same time inside the dialog.
+  const listbox = page.locator('[data-slot="select-content"][data-open]');
+  await expect(listbox).toBeVisible();
+  await listbox.locator(`[data-testid="option-${value}"]`).click();
 }
 
 /**
@@ -53,17 +66,15 @@ export async function pickUser(page: Page, userName: string) {
 }
 
 /**
- * Run an action that reports its outcome, and acknowledge that report.
+ * Run an action that reports its outcome, and wait for that report.
  *
- * The listener has to be armed before the click because a native `alert()`
- * blocks until it is answered, so the action is passed in rather than awaited
- * by the caller. A toast would instead be asserted after the fact — same call
- * signature either way, which is the point.
+ * Waiting on the toast is what makes this a synchronisation point: it only
+ * appears once the mutation has answered, so callers can assert on the
+ * resulting page state immediately afterwards.
  */
 export async function withNotice(page: Page, action: () => Promise<void>) {
-  const dialogPromise = page.waitForEvent("dialog");
   await action();
-  await (await dialogPromise).accept();
+  await expect(page.locator("[data-sonner-toast]").first()).toBeVisible();
 }
 
 export type AccountSpec = {
