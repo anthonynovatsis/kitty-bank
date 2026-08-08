@@ -2,6 +2,16 @@
 
 import { useState } from "react";
 import { api } from "~/trpc/react";
+import { Button } from "~/components/ui/button";
+import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
 
 type Mode = "deposit" | "withdraw" | "transfer";
 
@@ -136,35 +146,29 @@ export function CashTransactionForms({
 
       <div className="mb-4 flex gap-2">
         {MODES.map((m) => (
-          <button
+          <Button
             key={m.id}
             type="button"
+            size="sm"
+            variant={mode === m.id ? "default" : "secondary"}
             data-testid={`mode-${m.id}`}
             onClick={() => {
               setMode(m.id);
               setResult(null);
               setError(null);
             }}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium ${
-              mode === m.id
-                ? "bg-blue-600 text-white"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-            }`}
           >
             {m.label}
-          </button>
+          </Button>
         ))}
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label
-            htmlFor="amount"
-            className="mb-1 block text-sm font-medium text-gray-700"
-          >
+          <Label htmlFor="amount" className="mb-1">
             Amount *
-          </label>
-          <input
+          </Label>
+          <Input
             id="amount"
             data-testid="amount-input"
             type="number"
@@ -173,7 +177,6 @@ export function CashTransactionForms({
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             placeholder="0.00"
-            className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500 focus:outline-none"
           />
           {mode !== "deposit" && (
             <p className="mt-1 text-xs text-gray-500">
@@ -184,26 +187,33 @@ export function CashTransactionForms({
 
         {mode === "transfer" && (
           <div>
-            <label
-              htmlFor="transfer-target"
-              className="mb-1 block text-sm font-medium text-gray-700"
-            >
+            <Label htmlFor="transfer-target" className="mb-1">
               Transfer to *
-            </label>
-            <select
-              id="transfer-target"
-              data-testid="transfer-target"
+            </Label>
+            {/* Base UI hands back null when a select is cleared; "" is our empty. */}
+            <Select
               value={targetAccountId}
-              onChange={(e) => setTargetAccountId(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              onValueChange={(value) => setTargetAccountId(value ?? "")}
             >
-              <option value="">Select an account</option>
-              {transferTargets.map((account) => (
-                <option key={account.id} value={account.id}>
-                  {account.accountName} ({account.accountNumber})
-                </option>
-              ))}
-            </select>
+              <SelectTrigger
+                id="transfer-target"
+                data-testid="transfer-target"
+                className="w-full"
+              >
+                <SelectValue placeholder="Select an account" />
+              </SelectTrigger>
+              <SelectContent>
+                {transferTargets.map((account) => (
+                  <SelectItem
+                    key={account.id}
+                    value={account.id}
+                    data-testid={`option-${account.id}`}
+                  >
+                    {account.accountName} ({account.accountNumber})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {transferTargets.length === 0 && (
               <p
                 data-testid="no-transfer-targets"
@@ -216,20 +226,16 @@ export function CashTransactionForms({
         )}
 
         <div>
-          <label
-            htmlFor="transaction-date"
-            className="mb-1 block text-sm font-medium text-gray-700"
-          >
+          <Label htmlFor="transaction-date" className="mb-1">
             Date *
-          </label>
-          <input
+          </Label>
+          <Input
             id="transaction-date"
             data-testid="transaction-date-input"
             type="date"
             value={transactionDate}
             max={todayString()}
             onChange={(e) => setTransactionDate(e.target.value)}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500 focus:outline-none"
           />
           <p className="mt-1 text-xs text-gray-500">
             When the money moved. Defaults to today; back-date to record a past
@@ -238,31 +244,26 @@ export function CashTransactionForms({
         </div>
 
         <div>
-          <label
-            htmlFor="description"
-            className="mb-1 block text-sm font-medium text-gray-700"
-          >
+          <Label htmlFor="description" className="mb-1">
             Description
-          </label>
-          <input
+          </Label>
+          <Input
             id="description"
             data-testid="description-input"
             type="text"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Optional note"
-            className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500 focus:outline-none"
           />
         </div>
 
-        <button
+        <Button
           type="submit"
           data-testid="submit-transaction"
           disabled={isPending}
-          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
         >
           {isPending ? "Submitting..." : `Submit ${mode}`}
-        </button>
+        </Button>
       </form>
 
       {result && (

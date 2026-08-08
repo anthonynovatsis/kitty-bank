@@ -48,10 +48,10 @@ export async function chooseOptionByLabel(
   testId: string,
   label: string,
 ) {
-  const select = page.locator(`[data-testid="${testId}"]`);
-  const option = select.locator("option", { hasText: label });
-  await expect(option.first()).toBeAttached();
-  await select.selectOption((await option.first().getAttribute("value"))!);
+  await page.click(`[data-testid="${testId}"]`);
+  const listbox = page.locator('[data-slot="select-content"][data-open]');
+  await expect(listbox).toBeVisible();
+  await listbox.locator('[role="option"]', { hasText: label }).first().click();
 }
 
 /** Pick a user in the admin search combobox. */
