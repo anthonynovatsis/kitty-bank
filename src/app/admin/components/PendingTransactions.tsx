@@ -5,6 +5,7 @@ import { api } from "~/trpc/react";
 import { StatusBadge } from "~/components/StatusBadge";
 import { Button } from "~/components/ui/button";
 import { EmptyState } from "~/components/ThemeIllustration";
+import { TableSkeleton } from "~/components/Skeletons";
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("en-US", {
@@ -33,7 +34,7 @@ export function PendingTransactions() {
   if (isLoading) {
     return (
       <div className="bg-card rounded-lg p-6 shadow">
-        <p className="text-muted-foreground">Loading pending transactions...</p>
+        <TableSkeleton />
       </div>
     );
   }

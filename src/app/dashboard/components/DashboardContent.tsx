@@ -4,6 +4,7 @@ import Link from "next/link";
 import { api } from "~/trpc/react";
 import { StatusBadge } from "~/components/StatusBadge";
 import { EmptyState } from "~/components/ThemeIllustration";
+import { CardGridSkeleton } from "~/components/Skeletons";
 
 export function DashboardContent() {
   const {
@@ -13,7 +14,7 @@ export function DashboardContent() {
   } = api.user.accounts.list.useQuery();
 
   if (isLoading) {
-    return <div className="animate-pulse">Loading accounts...</div>;
+    return <CardGridSkeleton />;
   }
 
   if (error) {

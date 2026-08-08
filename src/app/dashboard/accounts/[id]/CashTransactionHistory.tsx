@@ -2,6 +2,7 @@
 
 import { api } from "~/trpc/react";
 import { StatusBadge, statusTone } from "~/components/StatusBadge";
+import { TableSkeleton } from "~/components/Skeletons";
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("en-US", {
@@ -25,7 +26,7 @@ export function CashTransactionHistory({ accountId }: { accountId: string }) {
       </h2>
 
       {isLoading ? (
-        <p className="text-muted-foreground">Loading transactions...</p>
+        <TableSkeleton />
       ) : !data || data.length === 0 ? (
         <p data-testid="no-transactions" className="text-muted-foreground">
           No transactions yet.

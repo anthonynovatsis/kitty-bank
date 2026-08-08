@@ -6,6 +6,7 @@ import { StatusBadge, statusTone } from "~/components/StatusBadge";
 import { CashTransactionForms } from "./CashTransactionForms";
 import { CashTransactionHistory } from "./CashTransactionHistory";
 import { EmptyState } from "~/components/ThemeIllustration";
+import { SummarySkeleton } from "~/components/Skeletons";
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("en-US", {
@@ -29,13 +30,7 @@ export function AccountDetail({ accountId }: { accountId: string }) {
   });
 
   if (isLoading) {
-    return (
-      <div>
-        <div className="text-muted-foreground animate-pulse">
-          Loading account...
-        </div>
-      </div>
-    );
+    return <SummarySkeleton />;
   }
 
   if (error) {

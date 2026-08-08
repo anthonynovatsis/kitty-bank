@@ -7,6 +7,7 @@ import { Button } from "~/components/ui/button";
 import { CreateAccountDialog } from "./CreateAccountDialog";
 import { PendingTransactions } from "./PendingTransactions";
 import { EmptyState } from "~/components/ThemeIllustration";
+import { CardGridSkeleton } from "~/components/Skeletons";
 
 export function AdminDashboard() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -42,7 +43,7 @@ export function AdminDashboard() {
   };
 
   if (accountsLoading || usersLoading) {
-    return <div className="text-muted-foreground text-center">Loading...</div>;
+    return <CardGridSkeleton />;
   }
 
   const { cashAccounts = [], investmentAccounts = [] } = accountsData ?? {};
