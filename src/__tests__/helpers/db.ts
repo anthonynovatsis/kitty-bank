@@ -34,12 +34,17 @@ function migrationFiles(): string[] {
 function loadStatements(): string[] {
   return migrationFiles().flatMap((file) => {
     const sql = readFileSync(join(MIGRATIONS_DIR, file), "utf-8");
-    return sql
-      .split("--> statement-breakpoint")
-      .map((s) => s.trim())
-      // Strip comment-only fragments; `--` comments would otherwise swallow
-      // the statement they precede once newlines are normalised.
-      .filter((s) => s && !s.split("\n").every((line) => line.trim().startsWith("--")));
+    return (
+      sql
+        .split("--> statement-breakpoint")
+        .map((s) => s.trim())
+        // Strip comment-only fragments; `--` comments would otherwise swallow
+        // the statement they precede once newlines are normalised.
+        .filter(
+          (s) =>
+            s && !s.split("\n").every((line) => line.trim().startsWith("--")),
+        )
+    );
   });
 }
 

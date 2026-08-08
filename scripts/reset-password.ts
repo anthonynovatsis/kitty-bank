@@ -61,10 +61,7 @@ Note: Passwords must be at least 8 characters.
     .update(accounts)
     .set({ password: hashed })
     .where(
-      and(
-        eq(accounts.userId, user.id),
-        eq(accounts.providerId, "credential"),
-      ),
+      and(eq(accounts.userId, user.id), eq(accounts.providerId, "credential")),
     );
 
   console.log(`✅ Password reset successfully!

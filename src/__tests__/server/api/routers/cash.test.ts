@@ -321,7 +321,6 @@ describe("user.cash.deposit", () => {
     await expectCashError(
       caller.user.cash.deposit({ accountId, amount: 10 }),
       "account_closed",
-
     );
   });
 
@@ -397,7 +396,6 @@ describe("user.cash.withdraw", () => {
     await expectCashError(
       caller.user.cash.withdraw({ accountId, amount: 40.01 }),
       "insufficient_funds",
-
     );
     expect(await balanceOf(db, accountId)).toBe(40);
   });
@@ -412,7 +410,6 @@ describe("user.cash.withdraw", () => {
     await expectCashError(
       caller.user.cash.withdraw({ accountId, amount: 999 }),
       "insufficient_funds",
-
     );
 
     const rows = await db.query.cashTransactions.findMany({

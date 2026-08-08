@@ -11,7 +11,10 @@ import {
   type FakeUser,
 } from "../../../helpers/context";
 
-async function expectTRPCError(promise: Promise<unknown>, code: TRPCError["code"]) {
+async function expectTRPCError(
+  promise: Promise<unknown>,
+  code: TRPCError["code"],
+) {
   const error = await promise.catch((e: unknown) => e);
   expect(error).toBeInstanceOf(TRPCError);
   expect((error as TRPCError).code).toBe(code);
@@ -202,7 +205,9 @@ describe("admin.accounts.list", () => {
 
   it("filters by accountType investment", async () => {
     const caller = createTestCaller(db, makeSession(admin));
-    const result = await caller.admin.accounts.list({ accountType: "investment" });
+    const result = await caller.admin.accounts.list({
+      accountType: "investment",
+    });
     expect(result.cashAccounts.length).toBe(0);
     expect(result.investmentAccounts.length).toBe(1);
   });

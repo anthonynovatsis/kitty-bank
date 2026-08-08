@@ -10,7 +10,10 @@ import {
   type FakeUser,
 } from "../../../helpers/context";
 
-async function expectTRPCError(promise: Promise<unknown>, code: TRPCError["code"]) {
+async function expectTRPCError(
+  promise: Promise<unknown>,
+  code: TRPCError["code"],
+) {
   const error = await promise.catch((e: unknown) => e);
   expect(error).toBeInstanceOf(TRPCError);
   expect((error as TRPCError).code).toBe(code);
