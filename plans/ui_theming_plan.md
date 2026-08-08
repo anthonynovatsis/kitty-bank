@@ -161,15 +161,31 @@ unaffected throughout.
   Deliberate: it stops a fourth colour competing with the primary, but it does
   drop the green affordance.
 
-### Phase T3: Token sweep
+### Phase T3: Token sweep ✅
 
-- [ ] Replace every remaining literal palette class with a semantic token
-      (148 remain, down from 260 — `text-gray-500` ×46 and `bg-white` ×25 lead)
-- [ ] Resolve the blue/indigo split into a single `--primary`
-- [ ] Verify: `grep -rE 'bg-(blue|indigo|gray|green|red|yellow|purple)-[0-9]' src/app`
-      returns nothing
+- [x] Replace every remaining literal palette class with a semantic token
+- [x] Resolve the blue/indigo split into a single `--primary`
+- [x] Verify: `grep -rE 'bg-(blue|indigo|gray|green|red|yellow|purple)-[0-9]' src/app`
+      returns nothing — and the wider
+      `grep -rE '\b(bg|text|border|ring|divide)-(…|white|black)\b'` too
 
 **Result:** the app is themeable. Everything below is now cheap.
+
+**Implementation notes:**
+- The landing page's two links go through `buttonVariants` instead of
+  restating a button in Tailwind; that was the last place indigo survived.
+- Form feedback boxes use `tone-danger` / `tone-positive`, so they re-colour
+  with the badges rather than drifting from them.
+- `text-gray-{400,500,600}` all collapsed onto `muted-foreground` — three
+  weights of "less important" that no theme wants to keep distinct.
+- The approval toggle reads as a switch in token terms: `bg-input` track when
+  off, `bg-background` knob.
+- Light/dark token parity is complete. Only `--radius` and the (unused)
+  `--chart-*` lack `.dark` values, and both correctly inherit because `.dark`
+  only overrides.
+- One spec asserted on `.bg-red-50`. The sign-in and sign-up error boxes now
+  carry testids, per the CLAUDE.md convention that a restyle must not be able
+  to break a spec.
 
 ### Phase T4: Theme switching
 
