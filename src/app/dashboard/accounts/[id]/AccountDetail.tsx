@@ -210,9 +210,7 @@ function InvestmentAccountDetail({ account }: { account: InvestmentAccount }) {
                     <td className="text-foreground py-3 pr-4 font-semibold">
                       {holding.symbol}
                     </td>
-                    <td className="text-muted-foreground py-3 pr-4">
-                      {holding.companyName ?? "—"}
-                    </td>
+                    <td className="py-3 pr-4">{holding.companyName ?? "—"}</td>
                     <td className="py-3 pr-4 text-right">
                       {holding.quantity.toLocaleString()}
                     </td>

@@ -98,7 +98,7 @@ export function PendingTransactions() {
                   >
                     <td
                       data-testid="pending-transaction-date"
-                      className="text-muted-foreground py-3 pr-4 whitespace-nowrap"
+                      className="py-3 pr-4 whitespace-nowrap"
                     >
                       {transaction.transactionDate.toLocaleDateString()}
                       {/* Flag back-dating: an admin approving something dated
@@ -141,7 +141,7 @@ export function PendingTransactions() {
                         {formatCurrency(transaction.cashAccount.balance)}
                       </p>
                     </td>
-                    <td className="text-muted-foreground py-3 pr-4">
+                    <td className="py-3 pr-4">
                       {transaction.description ?? "—"}
                     </td>
                     <td
