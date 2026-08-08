@@ -138,9 +138,9 @@ export function CashTransactionForms({
   return (
     <div
       data-testid="cash-transaction-forms"
-      className="rounded-lg bg-white p-6 shadow"
+      className="bg-card rounded-lg p-6 shadow"
     >
-      <h2 className="mb-4 text-lg font-semibold text-gray-900">
+      <h2 className="text-foreground mb-4 text-lg font-semibold">
         New Transaction
       </h2>
 
@@ -179,7 +179,7 @@ export function CashTransactionForms({
             placeholder="0.00"
           />
           {mode !== "deposit" && (
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="text-muted-foreground mt-1 text-xs">
               Available: ${balance.toFixed(2)}
             </p>
           )}
@@ -217,7 +217,7 @@ export function CashTransactionForms({
             {transferTargets.length === 0 && (
               <p
                 data-testid="no-transfer-targets"
-                className="mt-1 text-xs text-gray-500"
+                className="text-muted-foreground mt-1 text-xs"
               >
                 You need another open cash account to transfer to.
               </p>
@@ -237,7 +237,7 @@ export function CashTransactionForms({
             max={todayString()}
             onChange={(e) => setTransactionDate(e.target.value)}
           />
-          <p className="mt-1 text-xs text-gray-500">
+          <p className="text-muted-foreground mt-1 text-xs">
             When the money moved. Defaults to today; back-date to record a past
             transaction.
           </p>
@@ -269,7 +269,7 @@ export function CashTransactionForms({
       {result && (
         <p
           data-testid="transaction-result"
-          className="mt-4 rounded-md bg-green-50 p-3 text-sm text-green-800"
+          className="bg-tone-positive text-tone-positive-foreground mt-4 rounded-md p-3 text-sm"
         >
           {result}
         </p>
@@ -277,7 +277,7 @@ export function CashTransactionForms({
       {error && (
         <p
           data-testid="transaction-error"
-          className="mt-4 rounded-md bg-red-50 p-3 text-sm text-red-800"
+          className="bg-tone-danger text-tone-danger-foreground mt-4 rounded-md p-3 text-sm"
         >
           {error}
         </p>

@@ -23,7 +23,7 @@ test("sign in with wrong password shows an error", async ({ page }) => {
   await page.fill("#email", ADMIN.email);
   await page.fill("#password", "wrong-password");
   await page.click('button[type="submit"]');
-  await expect(page.locator(".bg-red-50")).toBeVisible();
+  await expect(page.locator('[data-testid="signin-error"]')).toBeVisible();
 });
 
 test("sign up with a new email lands on dashboard", async ({ page }) => {

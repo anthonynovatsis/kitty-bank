@@ -60,16 +60,16 @@ export default function SignIn() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col justify-center bg-gray-50 py-12 sm:px-6 lg:px-8">
+    <div className="bg-muted flex min-h-screen flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
+        <h2 className="text-foreground mt-6 text-center text-3xl font-bold tracking-tight">
           Sign in to Kitty Bank
         </h2>
-        <p className="mt-2 text-center text-sm text-gray-600">
+        <p className="text-muted-foreground mt-2 text-center text-sm">
           Or{" "}
           <Link
             href="/signup"
-            className="font-medium text-indigo-600 hover:text-indigo-500"
+            className="text-primary hover:text-primary/80 font-medium"
           >
             create a new account
           </Link>
@@ -77,7 +77,7 @@ export default function SignIn() {
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white px-4 py-8 shadow sm:rounded-lg sm:px-10">
+        <div className="bg-card px-4 py-8 shadow sm:rounded-lg sm:px-10">
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div>
               <Label htmlFor="email">Email address</Label>
@@ -110,8 +110,13 @@ export default function SignIn() {
             </div>
 
             {error && (
-              <div className="rounded-md bg-red-50 p-4">
-                <div className="text-sm text-red-800">{error}</div>
+              <div
+                data-testid="signin-error"
+                className="bg-tone-danger rounded-md p-4"
+              >
+                <div className="text-tone-danger-foreground text-sm">
+                  {error}
+                </div>
               </div>
             )}
 

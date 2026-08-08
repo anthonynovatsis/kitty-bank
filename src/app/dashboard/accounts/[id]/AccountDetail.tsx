@@ -30,7 +30,9 @@ export function AccountDetail({ accountId }: { accountId: string }) {
   if (isLoading) {
     return (
       <div className="container mx-auto p-6">
-        <div className="animate-pulse text-gray-500">Loading account...</div>
+        <div className="text-muted-foreground animate-pulse">
+          Loading account...
+        </div>
       </div>
     );
   }
@@ -38,15 +40,15 @@ export function AccountDetail({ accountId }: { accountId: string }) {
   if (error) {
     return (
       <div className="container mx-auto p-6">
-        <div className="rounded-lg bg-red-50 p-4">
-          <p className="text-red-800">
+        <div className="bg-tone-danger rounded-lg p-4">
+          <p className="text-tone-danger-foreground">
             {error.data?.code === "NOT_FOUND"
               ? "Account not found."
               : "Failed to load account."}
           </p>
           <Link
             href="/dashboard"
-            className="mt-2 text-sm text-blue-600 hover:underline"
+            className="text-primary mt-2 text-sm hover:underline"
           >
             Back to dashboard
           </Link>
@@ -63,7 +65,7 @@ export function AccountDetail({ accountId }: { accountId: string }) {
         <Link
           data-testid="back-to-dashboard"
           href="/dashboard"
-          className="text-sm text-blue-600 hover:underline"
+          className="text-primary text-sm hover:underline"
         >
           ← Back to dashboard
         </Link>
@@ -94,12 +96,12 @@ function CashAccountDetail({ account }: { account: CashAccount }) {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">
+          <h1 className="text-foreground text-3xl font-bold">
             {account.accountName}
           </h1>
           <p
             data-testid="account-subtitle"
-            className="mt-1 text-sm text-gray-500"
+            className="text-muted-foreground mt-1 text-sm"
           >
             {account.accountNumber} •{" "}
             <span className="capitalize">{account.accountType}</span>
@@ -109,11 +111,13 @@ function CashAccountDetail({ account }: { account: CashAccount }) {
       </div>
 
       {/* Balance card */}
-      <div className="rounded-lg bg-white p-6 shadow">
-        <p className="text-sm font-medium text-gray-500">Current Balance</p>
+      <div className="bg-card rounded-lg p-6 shadow">
+        <p className="text-muted-foreground text-sm font-medium">
+          Current Balance
+        </p>
         <p
           data-testid="account-balance"
-          className="mt-1 text-4xl font-bold text-gray-900"
+          className="text-foreground mt-1 text-4xl font-bold"
         >
           {formatCurrency(account.balance)}
         </p>
@@ -156,21 +160,25 @@ function InvestmentAccountDetail({ account }: { account: InvestmentAccount }) {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">
+          <h1 className="text-foreground text-3xl font-bold">
             {account.accountName}
           </h1>
-          <p className="mt-1 text-sm text-gray-500">{account.accountNumber}</p>
+          <p className="text-muted-foreground mt-1 text-sm">
+            {account.accountNumber}
+          </p>
         </div>
         <AccountStatusBadge status={account.status} />
       </div>
 
       {/* Portfolio value card */}
-      <div className="rounded-lg bg-white p-6 shadow">
-        <p className="text-sm font-medium text-gray-500">Portfolio Value</p>
-        <p className="mt-1 text-4xl font-bold text-gray-900">
+      <div className="bg-card rounded-lg p-6 shadow">
+        <p className="text-muted-foreground text-sm font-medium">
+          Portfolio Value
+        </p>
+        <p className="text-foreground mt-1 text-4xl font-bold">
           {formatCurrency(account.totalValue)}
         </p>
-        <p className="mt-1 text-sm text-gray-500">
+        <p className="text-muted-foreground mt-1 text-sm">
           {account.holdings.length} holding
           {account.holdings.length !== 1 ? "s" : ""}
         </p>
@@ -179,16 +187,16 @@ function InvestmentAccountDetail({ account }: { account: InvestmentAccount }) {
       {/* Holdings table */}
       <div
         data-testid="holdings-section"
-        className="rounded-lg bg-white p-6 shadow"
+        className="bg-card rounded-lg p-6 shadow"
       >
-        <h2 className="mb-4 text-lg font-semibold text-gray-900">Holdings</h2>
+        <h2 className="text-foreground mb-4 text-lg font-semibold">Holdings</h2>
         {account.holdings.length === 0 ? (
-          <p className="text-gray-500">No holdings yet.</p>
+          <p className="text-muted-foreground">No holdings yet.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b text-left text-gray-500">
+                <tr className="text-muted-foreground border-b text-left">
                   <th className="pr-4 pb-3 font-medium">Symbol</th>
                   <th className="pr-4 pb-3 font-medium">Company</th>
                   <th className="pr-4 pb-3 text-right font-medium">Quantity</th>
@@ -196,13 +204,13 @@ function InvestmentAccountDetail({ account }: { account: InvestmentAccount }) {
                   <th className="pb-3 text-right font-medium">Total Value</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-border divide-y">
                 {account.holdings.map((holding) => (
                   <tr key={holding.id}>
-                    <td className="py-3 pr-4 font-semibold text-gray-900">
+                    <td className="text-foreground py-3 pr-4 font-semibold">
                       {holding.symbol}
                     </td>
-                    <td className="py-3 pr-4 text-gray-600">
+                    <td className="text-muted-foreground py-3 pr-4">
                       {holding.companyName ?? "—"}
                     </td>
                     <td className="py-3 pr-4 text-right">
@@ -225,9 +233,11 @@ function InvestmentAccountDetail({ account }: { account: InvestmentAccount }) {
       </div>
 
       {/* Buy/sell placeholder */}
-      <div className="rounded-lg bg-white p-6 shadow">
-        <h2 className="mb-4 text-lg font-semibold text-gray-900">Trade</h2>
-        <p className="text-gray-500">Buy and sell orders coming soon.</p>
+      <div className="bg-card rounded-lg p-6 shadow">
+        <h2 className="text-foreground mb-4 text-lg font-semibold">Trade</h2>
+        <p className="text-muted-foreground">
+          Buy and sell orders coming soon.
+        </p>
       </div>
     </div>
   );

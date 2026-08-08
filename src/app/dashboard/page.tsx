@@ -13,15 +13,15 @@ export default async function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow">
+    <div className="bg-muted min-h-screen">
+      <nav className="bg-card shadow">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 justify-between">
             <div className="flex items-center">
               <h1 className="text-xl font-semibold">Kitty Bank Dashboard</h1>
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-700">
+              <span className="text-foreground text-sm">
                 Welcome, {session.user?.name || session.user?.email}
               </span>
               <form>

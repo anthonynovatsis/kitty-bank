@@ -17,8 +17,10 @@ export function DashboardContent() {
 
   if (error) {
     return (
-      <div className="rounded-lg bg-red-50 p-4">
-        <p className="text-red-800">Error loading accounts: {error.message}</p>
+      <div className="bg-tone-danger rounded-lg p-4">
+        <p className="text-tone-danger-foreground">
+          Error loading accounts: {error.message}
+        </p>
       </div>
     );
   }
@@ -37,14 +39,14 @@ export function DashboardContent() {
   return (
     <>
       {/* Total Net Worth Summary */}
-      <div className="rounded-lg bg-white p-6 shadow">
-        <h2 className="mb-4 text-2xl font-bold text-gray-900">
+      <div className="bg-card rounded-lg p-6 shadow">
+        <h2 className="text-foreground mb-4 text-2xl font-bold">
           Total Net Worth
         </h2>
-        <p className="text-4xl font-bold text-green-600">
+        <p className="text-tone-positive-foreground text-4xl font-bold">
           ${totalNetWorth.toFixed(2)}
         </p>
-        <div className="mt-2 text-sm text-gray-500">
+        <div className="text-muted-foreground mt-2 text-sm">
           <p>Cash: ${totalCashBalance.toFixed(2)}</p>
           <p>Investments: ${totalInvestmentValue.toFixed(2)}</p>
         </div>
@@ -57,18 +59,18 @@ export function DashboardContent() {
           <Link
             key={account.id}
             href={`/dashboard/accounts/${account.id}`}
-            className="block rounded-lg bg-white p-6 shadow transition-shadow hover:shadow-md"
+            className="bg-card block rounded-lg p-6 shadow transition-shadow hover:shadow-md"
           >
             <div className="flex items-center justify-between">
-              <h3 className="font-medium text-gray-900">
+              <h3 className="text-foreground font-medium">
                 {account.accountName}
               </h3>
               <StatusBadge tone="info">{account.accountType}</StatusBadge>
             </div>
-            <p className="mt-2 text-2xl font-bold text-gray-900">
+            <p className="text-foreground mt-2 text-2xl font-bold">
               ${account.balance.toFixed(2)}
             </p>
-            <p className="text-sm text-gray-500">
+            <p className="text-muted-foreground text-sm">
               Account: {account.accountNumber}
             </p>
           </Link>
@@ -79,18 +81,18 @@ export function DashboardContent() {
           <Link
             key={account.id}
             href={`/dashboard/accounts/${account.id}`}
-            className="block rounded-lg bg-white p-6 shadow transition-shadow hover:shadow-md"
+            className="bg-card block rounded-lg p-6 shadow transition-shadow hover:shadow-md"
           >
             <div className="flex items-center justify-between">
-              <h3 className="font-medium text-gray-900">
+              <h3 className="text-foreground font-medium">
                 {account.accountName}
               </h3>
               <StatusBadge tone="accent">investment</StatusBadge>
             </div>
-            <p className="mt-2 text-2xl font-bold text-gray-900">
+            <p className="text-foreground mt-2 text-2xl font-bold">
               ${account.totalValue.toFixed(2)}
             </p>
-            <p className="text-sm text-gray-500">
+            <p className="text-muted-foreground text-sm">
               {account.holdingsCount} holdings • {account.accountNumber}
             </p>
           </Link>
@@ -99,8 +101,8 @@ export function DashboardContent() {
         {/* No Accounts Message */}
         {!accounts?.cashAccounts.length &&
           !accounts?.investmentAccounts.length && (
-            <div className="col-span-full rounded-lg bg-gray-50 p-8 text-center">
-              <p className="text-gray-500">
+            <div className="bg-muted col-span-full rounded-lg p-8 text-center">
+              <p className="text-muted-foreground">
                 No accounts yet. Contact your administrator to create accounts.
               </p>
             </div>
@@ -108,11 +110,13 @@ export function DashboardContent() {
       </div>
 
       {/* Recent Activity Placeholder */}
-      <div className="mt-8 rounded-lg bg-white p-6 shadow">
-        <h3 className="mb-4 text-lg font-medium text-gray-900">
+      <div className="bg-card mt-8 rounded-lg p-6 shadow">
+        <h3 className="text-foreground mb-4 text-lg font-medium">
           Recent Activity
         </h3>
-        <p className="text-gray-500">Transaction history coming soon...</p>
+        <p className="text-muted-foreground">
+          Transaction history coming soon...
+        </p>
       </div>
     </>
   );

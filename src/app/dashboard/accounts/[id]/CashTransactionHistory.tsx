@@ -18,23 +18,23 @@ export function CashTransactionHistory({ accountId }: { accountId: string }) {
   return (
     <div
       data-testid="transaction-history"
-      className="rounded-lg bg-white p-6 shadow"
+      className="bg-card rounded-lg p-6 shadow"
     >
-      <h2 className="mb-4 text-lg font-semibold text-gray-900">
+      <h2 className="text-foreground mb-4 text-lg font-semibold">
         Transaction History
       </h2>
 
       {isLoading ? (
-        <p className="text-gray-500">Loading transactions...</p>
+        <p className="text-muted-foreground">Loading transactions...</p>
       ) : !data || data.length === 0 ? (
-        <p data-testid="no-transactions" className="text-gray-500">
+        <p data-testid="no-transactions" className="text-muted-foreground">
           No transactions yet.
         </p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b text-left text-gray-500">
+              <tr className="text-muted-foreground border-b text-left">
                 <th className="pr-4 pb-3 font-medium">Date</th>
                 <th className="pr-4 pb-3 font-medium">Type</th>
                 <th className="pr-4 pb-3 font-medium">Description</th>
@@ -42,12 +42,12 @@ export function CashTransactionHistory({ accountId }: { accountId: string }) {
                 <th className="pb-3 font-medium">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-border divide-y">
               {data.map((transaction) => (
                 <tr key={transaction.id} data-testid="transaction-row">
                   <td
                     data-testid="transaction-date"
-                    className="py-3 pr-4 text-gray-600"
+                    className="text-muted-foreground py-3 pr-4"
                   >
                     {transaction.transactionDate.toLocaleDateString()}
                   </td>
@@ -57,21 +57,21 @@ export function CashTransactionHistory({ accountId }: { accountId: string }) {
                   >
                     {transaction.transactionType}
                     {transaction.counterparty && (
-                      <span className="ml-1 text-gray-500">
+                      <span className="text-muted-foreground ml-1">
                         {transaction.direction === "credit" ? "from" : "to"}{" "}
                         {transaction.counterparty.accountName}
                       </span>
                     )}
                   </td>
-                  <td className="py-3 pr-4 text-gray-600">
+                  <td className="text-muted-foreground py-3 pr-4">
                     {transaction.description ?? "—"}
                   </td>
                   <td
                     data-testid="transaction-amount"
                     className={`py-3 pr-4 text-right font-medium ${
                       transaction.direction === "credit"
-                        ? "text-green-700"
-                        : "text-gray-900"
+                        ? "text-tone-positive-foreground"
+                        : "text-foreground"
                     }`}
                   >
                     {transaction.direction === "credit" ? "+" : "−"}

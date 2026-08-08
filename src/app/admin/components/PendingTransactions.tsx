@@ -31,8 +31,8 @@ export function PendingTransactions() {
 
   if (isLoading) {
     return (
-      <div className="rounded-lg bg-white p-6 shadow">
-        <p className="text-gray-500">Loading pending transactions...</p>
+      <div className="bg-card rounded-lg p-6 shadow">
+        <p className="text-muted-foreground">Loading pending transactions...</p>
       </div>
     );
   }
@@ -42,7 +42,7 @@ export function PendingTransactions() {
   return (
     <div
       data-testid="pending-transactions"
-      className="rounded-lg bg-white p-6 shadow"
+      className="bg-card rounded-lg p-6 shadow"
     >
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-lg font-medium">Transaction Approval Queue</h3>
@@ -58,21 +58,24 @@ export function PendingTransactions() {
       {error && (
         <p
           data-testid="approval-error"
-          className="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-800"
+          className="bg-tone-danger text-tone-danger-foreground mb-4 rounded-md p-3 text-sm"
         >
           {error}
         </p>
       )}
 
       {transactions.length === 0 ? (
-        <p data-testid="no-pending-transactions" className="text-gray-500">
+        <p
+          data-testid="no-pending-transactions"
+          className="text-muted-foreground"
+        >
           No transactions awaiting approval.
         </p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b text-left text-gray-500">
+              <tr className="text-muted-foreground border-b text-left">
                 <th className="pr-4 pb-3 font-medium">Date</th>
                 <th className="pr-4 pb-3 font-medium">User</th>
                 <th className="pr-4 pb-3 font-medium">Type</th>
@@ -82,7 +85,7 @@ export function PendingTransactions() {
                 <th className="pb-3 font-medium">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-border divide-y">
               {transactions.map((transaction) => {
                 const isDeciding =
                   decide.isPending &&
@@ -95,7 +98,7 @@ export function PendingTransactions() {
                   >
                     <td
                       data-testid="pending-transaction-date"
-                      className="py-3 pr-4 whitespace-nowrap text-gray-600"
+                      className="text-muted-foreground py-3 pr-4 whitespace-nowrap"
                     >
                       {transaction.transactionDate.toLocaleDateString()}
                       {/* Flag back-dating: an admin approving something dated
@@ -115,7 +118,7 @@ export function PendingTransactions() {
                       <p className="font-medium">
                         {transaction.createdBy.name ?? "—"}
                       </p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-muted-foreground text-xs">
                         {transaction.createdBy.email}
                       </p>
                     </td>
@@ -129,16 +132,16 @@ export function PendingTransactions() {
                       <p>{transaction.cashAccount.accountName}</p>
                       {transaction.transactionType === "transfer" &&
                         transaction.toAccount && (
-                          <p className="text-xs text-gray-500">
+                          <p className="text-muted-foreground text-xs">
                             → {transaction.toAccount.accountName}
                           </p>
                         )}
-                      <p className="text-xs text-gray-500">
+                      <p className="text-muted-foreground text-xs">
                         Balance:{" "}
                         {formatCurrency(transaction.cashAccount.balance)}
                       </p>
                     </td>
-                    <td className="py-3 pr-4 text-gray-600">
+                    <td className="text-muted-foreground py-3 pr-4">
                       {transaction.description ?? "—"}
                     </td>
                     <td
