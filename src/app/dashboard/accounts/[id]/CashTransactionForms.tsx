@@ -64,6 +64,16 @@ export function CashTransactionForms({
       (account) => account.id !== accountId && account.status === "active",
     ) ?? [];
 
+  /*
+   * The select's values are account ids, so the trigger has to be told how to
+   * label them — Base UI's <SelectValue> renders the raw value otherwise, and
+   * a chosen account shows as a bare UUID.
+   */
+  const transferItems = transferTargets.map((account) => ({
+    value: account.id,
+    label: `${account.accountName} (${account.accountNumber})`,
+  }));
+
   const resetForm = () => {
     setAmount("");
     setDescription("");
@@ -192,6 +202,7 @@ export function CashTransactionForms({
             </Label>
             {/* Base UI hands back null when a select is cleared; "" is our empty. */}
             <Select
+              items={transferItems}
               value={targetAccountId}
               onValueChange={(value) => setTargetAccountId(value ?? "")}
             >

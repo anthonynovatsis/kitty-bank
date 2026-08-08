@@ -12,12 +12,23 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 
+/*
+ * Base UI's <SelectValue> renders the label of the selected item only when the
+ * Root is told what the items are; without this it falls back to the raw value
+ * and the trigger reads "kitten" rather than "Kitten".
+ */
+const THEME_ITEMS = THEMES.map(({ id, label }) => ({ value: id, label }));
+
 export function ThemeSwitcher() {
   const { theme, mode, setTheme, setMode } = useTheme();
 
   return (
     <div className="flex items-center gap-2">
-      <Select value={theme} onValueChange={(value) => setTheme(value ?? theme)}>
+      <Select
+        items={THEME_ITEMS}
+        value={theme}
+        onValueChange={(value) => setTheme(value ?? theme)}
+      >
         <SelectTrigger
           size="sm"
           data-testid="theme-select"

@@ -23,6 +23,10 @@ test.describe("theming", () => {
     await chooseOption(page, "theme-select", "kitten");
 
     await expect(page.locator("html")).toHaveAttribute("data-theme", "kitten");
+    // Title-cased label, not the "kitten" cookie value.
+    await expect(page.locator('[data-testid="theme-select"]')).toContainText(
+      "Kitten",
+    );
     // Typeface is the assertion that proves the font indirection works —
     // a theme that only recoloured would still pass the background check.
     expect(await bodyFont(page)).not.toBe(before.font);

@@ -48,10 +48,16 @@ export async function chooseOptionByLabel(
   testId: string,
   label: string,
 ) {
-  await page.click(`[data-testid="${testId}"]`);
+  const trigger = page.locator(`[data-testid="${testId}"]`);
+  await trigger.click();
   const listbox = page.locator('[data-slot="select-content"][data-open]');
   await expect(listbox).toBeVisible();
   await listbox.locator('[role="option"]', { hasText: label }).first().click();
+
+  // The trigger must show the label it was picked by. Base UI renders the raw
+  // value unless the Select is given `items`, which once left a chosen account
+  // displaying its UUID.
+  await expect(trigger).toContainText(label);
 }
 
 /** Pick a user in the admin search combobox. */

@@ -23,6 +23,17 @@ import {
 } from "~/components/ui/select";
 import { UserSearchCombobox } from "./UserSearchCombobox";
 
+// Labels for <SelectValue>; without `items` Base UI shows the raw value.
+const ACCOUNT_TYPE_ITEMS = [
+  { value: "cash", label: "Cash Account" },
+  { value: "investment", label: "Investment Account" },
+];
+
+const CASH_ACCOUNT_TYPE_ITEMS = [
+  { value: "checking", label: "Checking" },
+  { value: "savings", label: "Savings" },
+];
+
 interface CreateAccountDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -127,6 +138,7 @@ export function CreateAccountDialog({
           <div className="space-y-1">
             <Label htmlFor="account-type">Account Type *</Label>
             <Select
+              items={ACCOUNT_TYPE_ITEMS}
               value={accountType}
               onValueChange={(value) => {
                 setAccountType(value ?? "");
@@ -157,6 +169,7 @@ export function CreateAccountDialog({
             <div className="space-y-1">
               <Label htmlFor="cash-account-type">Cash Account Type *</Label>
               <Select
+                items={CASH_ACCOUNT_TYPE_ITEMS}
                 value={cashAccountType}
                 onValueChange={(value) => setCashAccountType(value ?? "")}
               >
