@@ -99,45 +99,72 @@ unaffected throughout.
 
 ## Phases
 
-### Phase T1: Foundation — tokens, no visual change
+### Phase T1: Foundation — tokens, no visual change ✅
 
-- [ ] Install shadcn (`npx shadcn@latest init`) and its deps
-- [ ] Define the semantic token set in `src/styles/globals.css` under `@theme`:
+- [x] Install shadcn (`npx shadcn@latest init`) and its deps
+- [x] Define the semantic token set in `src/styles/globals.css` under `@theme`:
       `--background`, `--foreground`, `--card`, `--card-foreground`, `--primary`,
       `--primary-foreground`, `--muted`, `--muted-foreground`, `--border`,
       `--input`, `--ring`, `--destructive`, `--radius`
-- [ ] Add the six badge tone pairs as tokens:
+- [x] Add the six badge tone pairs as tokens:
       `--tone-{neutral,positive,warning,danger,info,accent}` + `-foreground`
-- [ ] Set the default theme's values to match today's colours exactly, so this
+- [x] Set the default theme's values to match today's colours exactly, so this
       phase renders identically
-- [ ] Add `cn()` util at `src/lib/utils.ts`
+- [x] Add `cn()` util at `src/lib/utils.ts`
 
 **Result:** tokens exist, nothing looks different, nothing can regress.
 
-### Phase T2: Component adoption
+### Phase T2: Component adoption ✅
 
-- [ ] Add components: `button`, `input`, `label`, `select`, `dialog`, `command`,
+- [x] Add components: `button`, `input`, `label`, `select`, `dialog`, `command`,
       `badge`, `card`, `table`, `sonner`, `popover`
-- [ ] **Refactor `tests/e2e/helpers.ts` to funnel all `selectOption` calls
+- [x] **Refactor `tests/e2e/helpers.ts` to funnel all `selectOption` calls
       through one helper** (do this first — see Test Impact)
-- [ ] Replace `CreateAccountDialog.tsx` internals with `Dialog` — biggest
+- [x] Replace `CreateAccountDialog.tsx` internals with `Dialog` — biggest
       accessibility win, and it retires the 4 `alert()` calls in favour of
       `sonner` toasts
-- [ ] Replace `UserSearchCombobox.tsx` with `Command` — second-biggest win
-- [ ] Replace the 3 native `<select>`s with `Select`
-- [ ] Replace the 13 `<button>`s and 11 `<input>`s
-- [ ] **Port `Badge.tsx` onto the shadcn badge.** Keep `statusTone()` and
+- [x] Replace `UserSearchCombobox.tsx` with `Command` — second-biggest win
+- [x] Replace the 3 native `<select>`s with `Select`
+- [x] Replace the 13 `<button>`s and 11 `<input>`s
+- [x] **Port `Badge.tsx` onto the shadcn badge.** Keep `statusTone()` and
       `sentenceCase()` — that logic is the valuable part, and the `sentenceCase`
       doc comment (why not the `capitalize` class) must survive. Delete
       `src/app/_components/Badge.tsx` once call sites move; do not run two badge
       systems.
-- [ ] Re-anchor `data-testid` attributes; `pnpm test:e2e` green
+- [x] Re-anchor `data-testid` attributes; `pnpm test:e2e` green
 
 **Result:** accessible components, one badge system, no `alert()`.
+
+**Implementation notes:**
+- Components are generated against Base UI (`"style": "base-nova"` in
+  components.json), shadcn v4's default. `shadcn` itself is a devDependency —
+  it is a codegen CLI, and `@import "shadcn/tailwind.css"` resolves at build
+  time.
+- Base UI differs from the Radix-era API in three places that bit: `render`
+  replaces `asChild`, `onValueChange` can hand back `null`, and Button
+  defaults to `type="button"` — which silently disabled the sign-out
+  formAction until it was given an explicit `type="submit"`.
+- Tone mapping lives in `src/components/StatusBadge.tsx`, not in
+  `ui/badge.tsx`, so the shadcn file can be re-added without clobbering it.
+- Base UI keeps a Select's value in React state and never writes it to the
+  DOM, so `SelectItem`s carry `option-<value>` testids for the specs to aim at.
+- `chooseOption` targets `[data-slot="select-content"][data-open]`. Base UI
+  keeps every select's popup mounted, and `[role="listbox"]` would also catch
+  cmdk's list, which is open at the same time inside the dialog.
+- The popover is sized with `--anchor-width`, Base UI's trigger-width variable.
+- `shouldFilter={false}` on the user combobox is load-bearing: results come
+  from `admin.users.search`, and cmdk's default substring match would hide
+  rows the server deliberately returned.
+- The admin tab strip is still native `<button>`s. It wants shadcn `Tabs`,
+  which is a structural change rather than a control swap.
+- Approve moved from green-600 to the primary button, with Reject as outline.
+  Deliberate: it stops a fourth colour competing with the primary, but it does
+  drop the green affordance.
 
 ### Phase T3: Token sweep
 
 - [ ] Replace every remaining literal palette class with a semantic token
+      (148 remain, down from 260 — `text-gray-500` ×46 and `bg-white` ×25 lead)
 - [ ] Resolve the blue/indigo split into a single `--primary`
 - [ ] Verify: `grep -rE 'bg-(blue|indigo|gray|green|red|yellow|purple)-[0-9]' src/app`
       returns nothing
