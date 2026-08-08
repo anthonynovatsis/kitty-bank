@@ -187,18 +187,33 @@ unaffected throughout.
   carry testids, per the CLAUDE.md convention that a restyle must not be able
   to break a spec.
 
-### Phase T4: Theme switching
+### Phase T4: Theme switching ✅
 
-- [ ] `data-theme` attribute on `<html>`; themes as `:root[data-theme="…"]` blocks
-- [ ] Inline script in `layout.tsx` to set it **before** hydration (the
-      `next-themes` trick) — otherwise there is a flash of the default theme
-- [ ] Persist to a cookie, not `localStorage`, so RSCs can read the choice
-- [ ] Theme switcher UI
-- [ ] Per-theme fonts: `next/font` loads at module scope, so load **all** theme
+- [x] `data-theme` attribute on `<html>`; themes as `:root[data-theme="…"]` blocks
+- [x] ~~Inline script in `layout.tsx`~~ — **not needed.** The de-flash script
+      exists to correct a first paint driven by `localStorage`. Reading the
+      cookie server-side means `<html>` is already right in the response, so
+      there is nothing to correct
+- [x] Persist to a cookie, not `localStorage`, so RSCs can read the choice
+- [x] Theme switcher UI
+- [x] Per-theme fonts: `next/font` loads at module scope, so load **all** theme
       fonts in `layout.tsx` and have each theme point `--font-sans` at a
       different `--font-*` variable. This is what makes themes feel genuinely
       different rather than recoloured.
-- [ ] Add a `dark` variant per theme while the token work is fresh
+- [x] Add a `dark` variant per theme while the token work is fresh
+
+**T4 implementation notes:**
+- Theme and mode are separate axes: `data-theme` on `<html>` for the palette,
+  the `.dark` class for mode. Keeping `.dark` means shadcn's own `dark:`
+  variants and `@custom-variant dark` keep working untouched.
+- `ThemeProvider` writes the DOM directly and holds state only so the switcher
+  can show what is active. Rendering `<html>` from React state would
+  reintroduce the flash this design avoids.
+- `parseTheme`/`parseMode` fall back on unrecognised values — a cookie is user
+  input. Covered by a spec.
+- The Kitten and Serious palettes from the T6 table landed here, because a
+  switcher with one option cannot be tested. T6 is now just the Terminal
+  theme and refinement.
 
 ### Phase T5: Theme graphics
 
@@ -229,7 +244,7 @@ SVG set. Record the licence in the repo for anything third-party. Raster/AI-
 generated art is a poor fit here: it will not inherit theme colour and will
 fight the dark variant.
 
-### Phase T6: Theme designs
+### Phase T6: Theme designs — palettes done in T4 ✅, Terminal outstanding
 
 | | Kitten | Serious | Terminal |
 |---|---|---|---|
