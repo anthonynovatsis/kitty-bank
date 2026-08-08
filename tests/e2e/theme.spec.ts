@@ -107,8 +107,11 @@ test.describe("theming", () => {
       // The art takes its colour from the palette rather than a literal, so it
       // must resolve to the theme's primary rather than to some fixed pink.
       const [artFill, themePrimary] = await Promise.all([
+        // Anchored to the body role rather than to "the first circle", which
+        // was whichever shape happened to be drawn first and moved the moment
+        // the art was redrawn.
         kittenArt
-          .locator("circle")
+          .locator('[data-role="body"] ellipse')
           .first()
           .evaluate((el) => getComputedStyle(el).fill),
         // Resolved through a real property, not read raw: the custom property

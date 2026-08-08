@@ -24,7 +24,7 @@ accordingly. If the art arrives with baked-in colours, it breaks in dark mode
 and cannot be themed — that is the one failure mode that makes the work
 unusable.
 
-There are **five roles**. Please use no more than these:
+There are **six roles**. Please use no more than these:
 
 | Role | What it's for | Kitten light | Kitten dark |
 |---|---|---|---|
@@ -33,6 +33,11 @@ There are **five roles**. Please use no more than these:
 | `prop` | objects the cat interacts with — bowl, card, cushion | `#FFDFD8` | `#4B2F31` |
 | `coin` | money specifically — coins, notes | `#FFEBB1` | `#6A3A06` |
 | `hint` | faint detail — whiskers, motion lines, "z"s | `#846261` | `#C4AAA6` |
+| `ink` | eyes and nose only | `#2E1416` | `#2E1416` |
+
+`ink` is the one role that does **not** change between light and dark. It only
+ever sits on top of `body`, which stays a mid pink in both modes, so inverting
+it would wash the eyes out.
 
 The hex values are what those roles resolve to today, given so you can preview.
 **Do not treat them as the spec** — the spec is the role name. We swap the
@@ -82,7 +87,8 @@ other at a glance** — that is their job on the dashboard.
 - **Flat vector only.** No gradients, no mesh fills, no blurs, no drop shadows,
   no embedded raster images, no clipping to raster masks.
 - **Group by role.** Each top-level group named exactly `body`, `cutout`,
-  `prop`, `coin`, `hint`. A shape's colour is decided by which group it is in.
+  `prop`, `coin`, `hint`, `ink`. A shape's colour is decided by which group it
+  is in.
   This is what we script against.
 - **No `<style>` blocks, no CSS classes, no inline `style=` attributes.** Fills
   as plain `fill="…"` on the shape or its group.
@@ -105,7 +111,7 @@ other at a glance** — that is their job on the dashboard.
 ## Please avoid
 
 - Baked-in colour that ignores the role groups (the one blocking failure)
-- More than five colours
+- More than six colours
 - Anything that only reads at large size
 - Outlines/strokes as the primary construction — they thin out badly when scaled
 - Human figures, currency symbols, or country-specific money imagery
@@ -115,7 +121,7 @@ other at a glance** — that is their job on the dashboard.
 We will check each file for:
 
 - [ ] Opens as editable SVG with a `0 0 64 64` viewBox
-- [ ] Top-level groups named `body` / `cutout` / `prop` / `coin` / `hint`
+- [ ] Top-level groups named `body` / `cutout` / `prop` / `coin` / `hint` / `ink`
 - [ ] No gradients, filters, embedded images, `<style>`, or `style=` attributes
 - [ ] Legible at the rendered size in the table above, on both light and dark
       backgrounds

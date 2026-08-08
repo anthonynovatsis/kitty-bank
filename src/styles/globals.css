@@ -80,6 +80,7 @@
   --color-tone-info-foreground: var(--tone-info-foreground);
   --color-tone-accent: var(--tone-accent);
   --color-tone-accent-foreground: var(--tone-accent-foreground);
+  --color-art-ink: var(--art-ink);
 
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
@@ -135,6 +136,9 @@
   --tone-info-foreground: oklch(38% 0.11 258);
   --tone-accent: oklch(94% 0.035 300);
   --tone-accent-foreground: oklch(41% 0.17 302);
+
+  /* Eyes and nose. Unused by the default theme, whose marks are icons. */
+  --art-ink: oklch(25% 0.03 20);
 
   --chart-1: oklch(38% 0.11 258);
   --chart-2: oklch(45% 0.1 152);
@@ -248,6 +252,8 @@
   --tone-info-foreground: oklch(45% 0.16 262);
   --tone-accent: oklch(94% 0.045 320);
   --tone-accent-foreground: oklch(47% 0.19 320);
+
+  --art-ink: oklch(25% 0.03 20);
 }
 
 [data-theme="kitten"].dark {
@@ -264,7 +270,9 @@
   --secondary-foreground: oklch(96% 0.012 40);
   --muted: oklch(27% 0.035 15);
   --muted-foreground: oklch(76% 0.03 30);
-  --accent: oklch(34% 0.04 15);
+  /* Lifted off --card (27%): this is the illustrations' prop colour, and at
+     34% a bank card or piggy bank all but disappeared against the surface. */
+  --accent: oklch(41% 0.045 15);
   --accent-foreground: oklch(96% 0.012 40);
   --destructive: oklch(70% 0.18 22);
   --destructive-foreground: oklch(22% 0.03 15);
@@ -284,6 +292,10 @@
   --tone-info-foreground: oklch(88% 0.055 250);
   --tone-accent: oklch(38% 0.15 320);
   --tone-accent-foreground: oklch(89% 0.06 320);
+
+  /* Deliberately still dark: it sits on the body colour, which stays a mid
+     pink in dark mode, so inverting it would wash the eyes out. */
+  --art-ink: oklch(25% 0.03 20);
 }
 
 /*
