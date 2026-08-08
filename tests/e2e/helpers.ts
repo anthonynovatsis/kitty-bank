@@ -1,6 +1,71 @@
 import { expect, type Browser, type Page } from "@playwright/test";
 import { ADMIN_AUTH_FILE } from "../../playwright.config";
 
+/*
+ * ---------------------------------------------------------------------------
+ * Widget interactions
+ *
+ * Every spec drives dropdowns, the user combobox and post-mutation
+ * confirmations through the four helpers below, and never touches the
+ * underlying elements itself.
+ *
+ * That indirection exists because these three widgets are the ones phase T2 of
+ * plans/ui_theming_plan.md swaps for Base UI, and each swap breaks the obvious
+ * way of driving it: a Base UI Select renders a button and a portalled popup,
+ * so `selectOption()` and `<option>` stop existing, and replacing `alert()`
+ * with a toast means there is no native dialog event left to accept. Confining
+ * that knowledge here keeps the swap a one-file change.
+ * ---------------------------------------------------------------------------
+ */
+
+/** Choose a dropdown value by its underlying value attribute. */
+export async function chooseOption(page: Page, testId: string, value: string) {
+  await page.selectOption(`[data-testid="${testId}"]`, value);
+}
+
+/**
+ * Choose a dropdown value by what the option reads as on screen.
+ *
+ * For dropdowns whose values are ids: the label is the only stable handle a
+ * spec has, and matching is on substring because labels carry extra detail
+ * (account options append the account number).
+ */
+export async function chooseOptionByLabel(
+  page: Page,
+  testId: string,
+  label: string,
+) {
+  const select = page.locator(`[data-testid="${testId}"]`);
+  const option = select.locator("option", { hasText: label });
+  await expect(option.first()).toBeAttached();
+  await select.selectOption((await option.first().getAttribute("value"))!);
+}
+
+/** Pick a user in the admin search combobox. */
+export async function pickUser(page: Page, userName: string) {
+  await page.click('[data-testid="user-search-trigger"]');
+  await page.fill('[data-testid="user-search-input"]', userName);
+  const option = page.locator('[data-testid="user-search-option"]', {
+    hasText: userName,
+  });
+  await expect(option.first()).toBeVisible();
+  await option.first().click();
+}
+
+/**
+ * Run an action that reports its outcome, and acknowledge that report.
+ *
+ * The listener has to be armed before the click because a native `alert()`
+ * blocks until it is answered, so the action is passed in rather than awaited
+ * by the caller. A toast would instead be asserted after the fact — same call
+ * signature either way, which is the point.
+ */
+export async function withNotice(page: Page, action: () => Promise<void>) {
+  const dialogPromise = page.waitForEvent("dialog");
+  await action();
+  await (await dialogPromise).accept();
+}
+
 export type AccountSpec = {
   /** Display name of the user, as typed into the admin search combobox. */
   userName: string;
@@ -9,29 +74,29 @@ export type AccountSpec = {
   cashAccountType?: "checking" | "savings";
 };
 
+/** Open the create-account dialog. Assumes `page` is an admin session on /admin. */
+export async function openCreateAccountDialog(page: Page, userName: string) {
+  await page.click('[data-testid="create-account-open"]');
+  await expect(
+    page.locator('[data-testid="create-account-dialog"]'),
+  ).toBeVisible();
+  await pickUser(page, userName);
+}
+
 /** Create an account through the admin UI. Assumes `page` is an admin session. */
 export async function createAccount(page: Page, opts: AccountSpec) {
   await page.goto("/admin");
-  await page.click('button:has-text("Create Account")');
-  await expect(page.locator("text=Create New Account")).toBeVisible();
+  await openCreateAccountDialog(page, opts.userName);
 
-  await page.click('button:has-text("Search for a user")');
-  await page.fill(
-    'input[placeholder="Type to search users..."]',
-    opts.userName,
-  );
-  await page.waitForSelector(`button:has-text("${opts.userName}")`);
-  await page.click(`button:has-text("${opts.userName}")`);
-
-  await page.fill("#account-name", opts.accountName);
-  await page.selectOption("#account-type", opts.accountType);
+  await page.fill('[data-testid="account-name-input"]', opts.accountName);
+  await chooseOption(page, "account-type-select", opts.accountType);
   if (opts.cashAccountType) {
-    await page.selectOption("#cash-account-type", opts.cashAccountType);
+    await chooseOption(page, "cash-account-type-select", opts.cashAccountType);
   }
 
-  const dialogPromise = page.waitForEvent("dialog");
-  await page.click('button[type="submit"]:has-text("Create Account")');
-  await (await dialogPromise).accept();
+  await withNotice(page, () =>
+    page.click('[data-testid="create-account-submit"]'),
+  );
   await page.waitForLoadState("networkidle");
 }
 
@@ -177,14 +242,11 @@ export async function submitTransaction(
   }
 
   if (opts.mode === "transfer") {
-    // Option labels carry the account number too, so match on text and read
-    // back the id rather than trying for an exact label match.
-    const select = page.locator('[data-testid="transfer-target"]');
-    const option = select.locator("option", {
-      hasText: opts.targetAccountName ?? "",
-    });
-    await expect(option.first()).toBeAttached();
-    await select.selectOption((await option.first().getAttribute("value"))!);
+    await chooseOptionByLabel(
+      page,
+      "transfer-target",
+      opts.targetAccountName ?? "",
+    );
   }
 
   await page.click('[data-testid="submit-transaction"]');
