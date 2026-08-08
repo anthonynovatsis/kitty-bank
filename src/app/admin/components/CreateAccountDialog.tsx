@@ -73,7 +73,10 @@ export function CreateAccountDialog({
 
   return (
     <div className="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black">
-      <div className="mx-4 w-full max-w-md rounded-lg bg-white p-6">
+      <div
+        data-testid="create-account-dialog"
+        className="mx-4 w-full max-w-md rounded-lg bg-white p-6"
+      >
         <div className="mb-4">
           <h2 className="text-xl font-semibold">Create New Account</h2>
           <p className="text-sm text-gray-600">
@@ -104,6 +107,7 @@ export function CreateAccountDialog({
             </label>
             <input
               id="account-name"
+              data-testid="account-name-input"
               type="text"
               value={accountName}
               onChange={(e) => setAccountName(e.target.value)}
@@ -122,6 +126,7 @@ export function CreateAccountDialog({
             </label>
             <select
               id="account-type"
+              data-testid="account-type-select"
               value={accountType}
               onChange={(e) => {
                 const value = e.target.value as "cash" | "investment";
@@ -148,6 +153,7 @@ export function CreateAccountDialog({
               </label>
               <select
                 id="cash-account-type"
+                data-testid="cash-account-type-select"
                 value={cashAccountType}
                 onChange={(e) =>
                   setCashAccountType(e.target.value as "checking" | "savings")
@@ -164,6 +170,7 @@ export function CreateAccountDialog({
           <div className="mt-6 flex justify-end space-x-3">
             <button
               type="button"
+              data-testid="create-account-cancel"
               onClick={() => handleOpenChange(false)}
               disabled={createAccountMutation.isPending}
               className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none disabled:opacity-50"
@@ -172,10 +179,13 @@ export function CreateAccountDialog({
             </button>
             <button
               type="submit"
+              data-testid="create-account-submit"
               disabled={createAccountMutation.isPending}
               className="rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none disabled:opacity-50"
             >
-              {createAccountMutation.isPending ? "Creating..." : "Create Account"}
+              {createAccountMutation.isPending
+                ? "Creating..."
+                : "Create Account"}
             </button>
           </div>
         </form>

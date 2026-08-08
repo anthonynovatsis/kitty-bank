@@ -54,6 +54,7 @@ export function AdminDashboard() {
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-3xl font-bold">Account Management</h1>
         <button
+          data-testid="create-account-open"
           onClick={() => setShowCreateDialog(true)}
           className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700"
         >
@@ -230,8 +231,8 @@ export function AdminDashboard() {
                       {formatCurrency(account.balance)}
                     </p>
                     <Badge tone={statusTone(account.status)}>
-                        {account.status}
-                      </Badge>
+                      {account.status}
+                    </Badge>
                   </div>
                 </div>
               ))}
@@ -268,8 +269,8 @@ export function AdminDashboard() {
                       {formatCurrency(account.totalValue)}
                     </p>
                     <Badge tone={statusTone(account.status)}>
-                        {account.status}
-                      </Badge>
+                      {account.status}
+                    </Badge>
                   </div>
                 </div>
               ))}
