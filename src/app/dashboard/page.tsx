@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { getSession } from "~/server/better-auth/server";
 import { auth } from "~/server/better-auth";
 import { Button } from "~/components/ui/button";
+import { ThemeSwitcher } from "~/components/ThemeSwitcher";
 import { DashboardContent } from "./components/DashboardContent";
 
 export default async function Dashboard() {
@@ -21,6 +22,7 @@ export default async function Dashboard() {
               <h1 className="text-xl font-semibold">Kitty Bank Dashboard</h1>
             </div>
             <div className="flex items-center space-x-4">
+              <ThemeSwitcher />
               <span className="text-foreground text-sm">
                 Welcome, {session.user?.name || session.user?.email}
               </span>

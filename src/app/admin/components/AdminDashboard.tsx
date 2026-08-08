@@ -4,6 +4,7 @@ import { useState } from "react";
 import { api } from "~/trpc/react";
 import { StatusBadge, statusTone } from "~/components/StatusBadge";
 import { Button } from "~/components/ui/button";
+import { ThemeSwitcher } from "~/components/ThemeSwitcher";
 import { CreateAccountDialog } from "./CreateAccountDialog";
 import { PendingTransactions } from "./PendingTransactions";
 
@@ -54,12 +55,15 @@ export function AdminDashboard() {
     <div className="container mx-auto p-6">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-3xl font-bold">Account Management</h1>
-        <Button
-          data-testid="create-account-open"
-          onClick={() => setShowCreateDialog(true)}
-        >
-          Create Account
-        </Button>
+        <div className="flex items-center gap-3">
+          <ThemeSwitcher />
+          <Button
+            data-testid="create-account-open"
+            onClick={() => setShowCreateDialog(true)}
+          >
+            Create Account
+          </Button>
+        </div>
       </div>
 
       {/* Tabs */}
