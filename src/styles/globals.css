@@ -1,6 +1,209 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
 
 @theme {
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif,
     "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+}
+
+/*
+ * Every colour in the app resolves through one of the variables below. Nothing
+ * under src/app/ should name a palette colour directly (`bg-blue-600`) — a
+ * theme swaps these values and nothing else, so a literal is a colour that
+ * cannot be themed.
+ *
+ * The values in `:root` deliberately reproduce the colours the app shipped with
+ * before tokens existed, so introducing this file changed nothing on screen.
+ */
+
+@theme inline {
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+
+  /*
+   * Status tones, consumed by the badge. Named for what they mean, not what
+   * colour they are, so the Kitten theme can render "positive" as something
+   * other than green.
+   *
+   * `tone-accent` is unrelated to shadcn's `--accent` (a hover surface). This
+   * one is the investment/admin tone and keeps its name from the BadgeTone
+   * union it has to stay 1:1 with.
+   */
+  --color-tone-neutral: var(--tone-neutral);
+  --color-tone-neutral-foreground: var(--tone-neutral-foreground);
+  --color-tone-positive: var(--tone-positive);
+  --color-tone-positive-foreground: var(--tone-positive-foreground);
+  --color-tone-warning: var(--tone-warning);
+  --color-tone-warning-foreground: var(--tone-warning-foreground);
+  --color-tone-danger: var(--tone-danger);
+  --color-tone-danger-foreground: var(--tone-danger-foreground);
+  --color-tone-info: var(--tone-info);
+  --color-tone-info-foreground: var(--tone-info-foreground);
+  --color-tone-accent: var(--tone-accent);
+  --color-tone-accent-foreground: var(--tone-accent-foreground);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* Default theme. Values are the Tailwind palette colours the app already used. */
+:root {
+  --background: oklch(100% 0 0); /* white */
+  --foreground: oklch(21% 0.034 264.665); /* gray-900 */
+  --card: oklch(100% 0 0); /* white */
+  --card-foreground: oklch(21% 0.034 264.665); /* gray-900 */
+  --popover: oklch(100% 0 0); /* white */
+  --popover-foreground: oklch(21% 0.034 264.665); /* gray-900 */
+
+  /*
+   * The app had two primaries — blue-600 (5 call sites) and indigo-600 (3).
+   * blue-600 wins on usage and on matching the focus ring already in place.
+   * The indigo call sites collapse onto this in phase T3.
+   */
+  --primary: oklch(54.6% 0.245 262.881); /* blue-600 */
+  --primary-foreground: oklch(100% 0 0); /* white */
+
+  --secondary: oklch(96.7% 0.003 264.542); /* gray-100 */
+  --secondary-foreground: oklch(21% 0.034 264.665); /* gray-900 */
+  --muted: oklch(98.5% 0.002 247.839); /* gray-50 */
+  --muted-foreground: oklch(55.1% 0.027 264.364); /* gray-500 */
+  --accent: oklch(96.7% 0.003 264.542); /* gray-100 */
+  --accent-foreground: oklch(21% 0.034 264.665); /* gray-900 */
+  --destructive: oklch(57.7% 0.245 27.325); /* red-600 */
+  --destructive-foreground: oklch(100% 0 0); /* white */
+  --border: oklch(87.2% 0.01 258.338); /* gray-300 */
+  --input: oklch(87.2% 0.01 258.338); /* gray-300 */
+  --ring: oklch(62.3% 0.214 259.815); /* blue-500 */
+
+  --tone-neutral: oklch(96.7% 0.003 264.542); /* gray-100 */
+  --tone-neutral-foreground: oklch(44.6% 0.03 256.802); /* gray-600 */
+  --tone-positive: oklch(96.2% 0.044 156.743); /* green-100 */
+  --tone-positive-foreground: oklch(44.8% 0.119 151.328); /* green-800 */
+  --tone-warning: oklch(97.3% 0.071 103.193); /* yellow-100 */
+  --tone-warning-foreground: oklch(47.6% 0.114 61.907); /* yellow-800 */
+  --tone-danger: oklch(93.6% 0.032 17.717); /* red-100 */
+  --tone-danger-foreground: oklch(44.4% 0.177 26.899); /* red-800 */
+  --tone-info: oklch(93.2% 0.032 255.585); /* blue-100 */
+  --tone-info-foreground: oklch(42.4% 0.199 265.638); /* blue-800 */
+  --tone-accent: oklch(94.6% 0.033 307.174); /* purple-100 */
+  --tone-accent-foreground: oklch(43.8% 0.218 303.724); /* purple-800 */
+
+  --chart-1: oklch(54.6% 0.245 262.881);
+  --chart-2: oklch(62.7% 0.194 149.214);
+  --chart-3: oklch(55.8% 0.288 302.321);
+  --chart-4: oklch(68.1% 0.162 75.834);
+  --chart-5: oklch(57.7% 0.245 27.325);
+
+  --radius: 0.5rem;
+
+  --sidebar: oklch(98.5% 0.002 247.839);
+  --sidebar-foreground: oklch(21% 0.034 264.665);
+  --sidebar-primary: oklch(54.6% 0.245 262.881);
+  --sidebar-primary-foreground: oklch(100% 0 0);
+  --sidebar-accent: oklch(96.7% 0.003 264.542);
+  --sidebar-accent-foreground: oklch(21% 0.034 264.665);
+  --sidebar-border: oklch(87.2% 0.01 258.338);
+  --sidebar-ring: oklch(62.3% 0.214 259.815);
+}
+
+/*
+ * Dark values for the default theme. Nothing selects `.dark` yet — the theme
+ * switcher lands in phase T4. Kept in step with `:root` so the switch is a
+ * wiring job rather than a colour-picking job.
+ */
+.dark {
+  --background: oklch(21% 0.034 264.665); /* gray-900 */
+  --foreground: oklch(98.5% 0.002 247.839); /* gray-50 */
+  --card: oklch(27.8% 0.033 256.848); /* gray-800 */
+  --card-foreground: oklch(98.5% 0.002 247.839);
+  --popover: oklch(27.8% 0.033 256.848);
+  --popover-foreground: oklch(98.5% 0.002 247.839);
+
+  --primary: oklch(70.7% 0.165 254.624); /* blue-400 — lifted for contrast */
+  --primary-foreground: oklch(21% 0.034 264.665);
+  --secondary: oklch(37.3% 0.034 259.733); /* gray-700 */
+  --secondary-foreground: oklch(98.5% 0.002 247.839);
+  --muted: oklch(27.8% 0.033 256.848); /* gray-800 */
+  --muted-foreground: oklch(70.7% 0.022 261.325); /* gray-400 */
+  --accent: oklch(37.3% 0.034 259.733);
+  --accent-foreground: oklch(98.5% 0.002 247.839);
+  --destructive: oklch(70.4% 0.191 22.216); /* red-400 */
+  --destructive-foreground: oklch(21% 0.034 264.665);
+  --border: oklch(100% 0 0 / 12%);
+  --input: oklch(100% 0 0 / 16%);
+  --ring: oklch(62.3% 0.214 259.815);
+
+  /* Tones invert: the deep shade carries the fill, the pale one the text. */
+  --tone-neutral: oklch(37.3% 0.034 259.733);
+  --tone-neutral-foreground: oklch(87.2% 0.01 258.338);
+  --tone-positive: oklch(39.3% 0.095 152.535);
+  --tone-positive-foreground: oklch(92.5% 0.084 155.995);
+  --tone-warning: oklch(42.1% 0.095 57.708);
+  --tone-warning-foreground: oklch(94.5% 0.129 101.54);
+  --tone-danger: oklch(39.6% 0.141 25.723);
+  --tone-danger-foreground: oklch(88.5% 0.062 18.334);
+  --tone-info: oklch(37.9% 0.146 265.522);
+  --tone-info-foreground: oklch(88.2% 0.059 254.128);
+  --tone-accent: oklch(38.1% 0.176 304.987);
+  --tone-accent-foreground: oklch(90.2% 0.063 306.703);
+
+  --sidebar: oklch(27.8% 0.033 256.848);
+  --sidebar-foreground: oklch(98.5% 0.002 247.839);
+  --sidebar-primary: oklch(70.7% 0.165 254.624);
+  --sidebar-primary-foreground: oklch(21% 0.034 264.665);
+  --sidebar-accent: oklch(37.3% 0.034 259.733);
+  --sidebar-accent-foreground: oklch(98.5% 0.002 247.839);
+  --sidebar-border: oklch(100% 0 0 / 12%);
+  --sidebar-ring: oklch(62.3% 0.214 259.815);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
 }
