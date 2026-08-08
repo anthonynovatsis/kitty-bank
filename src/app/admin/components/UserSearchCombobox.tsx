@@ -1,7 +1,23 @@
 "use client";
 
 import { useState } from "react";
+import { CheckIcon, ChevronDownIcon } from "lucide-react";
 import { api, type RouterOutputs } from "~/trpc/react";
+import { Button } from "~/components/ui/button";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "~/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "~/components/ui/popover";
+import { cn } from "~/lib/utils";
 
 type SearchUser = RouterOutputs["admin"]["users"]["search"][number];
 
@@ -32,103 +48,84 @@ export function UserSearchCombobox({
   };
 
   return (
-    <div className="relative">
-      <button
-        type="button"
-        data-testid="user-search-trigger"
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex w-full items-center justify-between rounded-md border border-gray-300 bg-white px-3 py-2 text-left focus:border-transparent focus:ring-2 focus:ring-blue-500 focus:outline-none"
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverTrigger
+        render={
+          <Button
+            type="button"
+            variant="outline"
+            role="combobox"
+            data-testid="user-search-trigger"
+            className="w-full justify-between font-normal"
+          />
+        }
       >
         {value && selectedLabel ? (
           <span className="truncate">{selectedLabel}</span>
         ) : (
-          <span className="text-gray-500">Search for a user...</span>
+          <span className="text-muted-foreground">Search for a user...</span>
         )}
-        <svg
-          className="h-5 w-5 text-gray-400"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M19 9l-7 7-7-7"
+        <ChevronDownIcon className="size-4 shrink-0 opacity-50" />
+      </PopoverTrigger>
+      {/* --anchor-width is Base UI's trigger-width variable, set on the positioner. */}
+      <PopoverContent className="w-(--anchor-width) p-0" align="start">
+        {/*
+         * Results come from admin.users.search, so cmdk must not also filter
+         * them — its default substring match runs against the rendered label
+         * and would hide rows the server deliberately returned.
+         */}
+        <Command shouldFilter={false}>
+          <CommandInput
+            data-testid="user-search-input"
+            placeholder="Type to search users..."
+            value={searchQuery}
+            onValueChange={setSearchQuery}
           />
-        </svg>
-      </button>
+          <CommandList>
+            {isLoading && (
+              <div className="text-muted-foreground px-3 py-2 text-sm">
+                Searching...
+              </div>
+            )}
 
-      {isOpen && (
-        <>
-          <div className="fixed inset-0" onClick={() => setIsOpen(false)} />
-          <div className="absolute z-10 mt-1 w-full rounded-md border border-gray-300 bg-white shadow-lg">
-            <div className="p-2">
-              <input
-                type="text"
-                data-testid="user-search-input"
-                placeholder="Type to search users..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                autoFocus
-              />
-            </div>
+            {!searchQuery && (
+              <div className="text-muted-foreground px-3 py-2 text-sm">
+                Start typing to search users...
+              </div>
+            )}
 
-            <div className="max-h-48 overflow-y-auto">
-              {isLoading && (
-                <div className="px-3 py-2 text-gray-500">Searching...</div>
-              )}
+            {!isLoading && searchQuery && searchResults.length === 0 && (
+              <CommandEmpty>No users found.</CommandEmpty>
+            )}
 
-              {!isLoading && searchResults.length === 0 && searchQuery && (
-                <div className="px-3 py-2 text-gray-500">No users found.</div>
-              )}
-
-              {!searchQuery && (
-                <div className="px-3 py-2 text-gray-500">
-                  Start typing to search users...
-                </div>
-              )}
-
-              {searchResults.length > 0 && (
-                <div className="py-1">
-                  {searchResults.map((user) => (
-                    <button
-                      key={user.id}
-                      type="button"
-                      data-testid="user-search-option"
-                      onClick={() => handleUserSelect(user)}
-                      className={`flex w-full items-center px-3 py-2 text-left hover:bg-gray-100 ${
-                        value === user.id ? "bg-blue-50 text-blue-600" : ""
-                      }`}
-                    >
-                      {value === user.id && (
-                        <svg
-                          className="mr-2 h-4 w-4"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
+            {searchResults.length > 0 && (
+              <CommandGroup>
+                {searchResults.map((user) => (
+                  <CommandItem
+                    key={user.id}
+                    value={user.id}
+                    data-testid="user-search-option"
+                    onSelect={() => handleUserSelect(user)}
+                  >
+                    <CheckIcon
+                      className={cn(
+                        "mr-2 size-4",
+                        value === user.id ? "opacity-100" : "opacity-0",
                       )}
-                      <div className="flex flex-col">
-                        <span className="font-medium">{user.name}</span>
-                        <span className="text-sm text-gray-500">
-                          {user.email}
-                        </span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </>
-      )}
-    </div>
+                    />
+                    <div className="flex flex-col">
+                      <span className="font-medium">{user.name}</span>
+                      <span className="text-muted-foreground text-sm">
+                        {user.email}
+                      </span>
+                    </div>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }
