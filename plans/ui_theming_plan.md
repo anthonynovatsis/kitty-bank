@@ -237,12 +237,14 @@ Illustration is what sells the Kitten theme; without it the theme is just pink.
       so art inherits `currentColor` and tracks the theme's palette
 - [ ] Per-theme favicon + `metadata.icons` (currently one static `favicon.ico`)
 
-**Sourcing:** SVG is required for `currentColor` inheritance and for staying
-crisp. Options, in order of preference — commission or draw a small set (5-6
-marks is the whole surface list); or adapt a permissively-licensed cartoon-animal
-SVG set. Record the licence in the repo for anything third-party. Raster/AI-
-generated art is a poor fit here: it will not inherit theme colour and will
-fight the dark variant.
+**Sourcing:** see `plans/illustration_brief.md` — a hand-off document covering
+all 8 marks, the five colour roles, and the SVG requirements that keep the art
+themeable. Written so a commission drops into `ThemeIllustration.tsx` without
+touching anything else.
+
+The decision that matters is **colour by role, not by value**. Art with baked-in
+colour cannot be themed and breaks in dark mode; that is the one failure mode
+that makes a commission unusable. Everything else in the brief is negotiable.
 
 ### Phase T6: Theme designs — palettes done in T4 ✅, Terminal outstanding
 
