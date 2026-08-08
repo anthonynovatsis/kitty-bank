@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { api } from "~/trpc/react";
-import { Badge, statusTone } from "~/app/_components/Badge";
+import { StatusBadge, statusTone } from "~/components/StatusBadge";
 import { CreateAccountDialog } from "./CreateAccountDialog";
 import { PendingTransactions } from "./PendingTransactions";
 
@@ -156,9 +156,9 @@ export function AdminDashboard() {
                       <p className="font-medium">
                         {formatCurrency(account.balance)}
                       </p>
-                      <Badge tone={statusTone(account.status)}>
+                      <StatusBadge tone={statusTone(account.status)}>
                         {account.status}
-                      </Badge>
+                      </StatusBadge>
                     </div>
                   </div>
                 ))}
@@ -188,9 +188,9 @@ export function AdminDashboard() {
                       <p className="font-medium">
                         {formatCurrency(account.totalValue)}
                       </p>
-                      <Badge tone={statusTone(account.status)}>
+                      <StatusBadge tone={statusTone(account.status)}>
                         {account.status}
-                      </Badge>
+                      </StatusBadge>
                     </div>
                   </div>
                 ))}
@@ -230,9 +230,9 @@ export function AdminDashboard() {
                     <p className="text-lg font-medium">
                       {formatCurrency(account.balance)}
                     </p>
-                    <Badge tone={statusTone(account.status)}>
+                    <StatusBadge tone={statusTone(account.status)}>
                       {account.status}
-                    </Badge>
+                    </StatusBadge>
                   </div>
                 </div>
               ))}
@@ -268,9 +268,9 @@ export function AdminDashboard() {
                     <p className="text-lg font-medium">
                       {formatCurrency(account.totalValue)}
                     </p>
-                    <Badge tone={statusTone(account.status)}>
+                    <StatusBadge tone={statusTone(account.status)}>
                       {account.status}
-                    </Badge>
+                    </StatusBadge>
                   </div>
                 </div>
               ))}
@@ -331,12 +331,12 @@ export function AdminDashboard() {
                         {formatCurrency(user.totalCashBalance)}
                       </td>
                       <td className="py-3 pr-4">
-                        <Badge
+                        <StatusBadge
                           tone={user.isAdmin ? "accent" : "neutral"}
                           testId="role-badge"
                         >
                           {user.isAdmin ? "Admin" : "User"}
-                        </Badge>
+                        </StatusBadge>
                       </td>
                       <td className="py-3">
                         <label className="flex cursor-pointer items-center gap-2">

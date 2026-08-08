@@ -1,7 +1,7 @@
 "use client";
 
 import { api } from "~/trpc/react";
-import { Badge, statusTone } from "~/app/_components/Badge";
+import { StatusBadge, statusTone } from "~/components/StatusBadge";
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("en-US", {
@@ -78,12 +78,12 @@ export function CashTransactionHistory({ accountId }: { accountId: string }) {
                     {formatCurrency(transaction.amount)}
                   </td>
                   <td className="py-3">
-                    <Badge
+                    <StatusBadge
                       tone={statusTone(transaction.status)}
                       testId="transaction-status"
                     >
                       {transaction.status}
-                    </Badge>
+                    </StatusBadge>
                   </td>
                 </tr>
               ))}

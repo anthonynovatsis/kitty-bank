@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { api } from "~/trpc/react";
-import { Badge, statusTone } from "~/app/_components/Badge";
+import { StatusBadge, statusTone } from "~/components/StatusBadge";
 import { CashTransactionForms } from "./CashTransactionForms";
 import { CashTransactionHistory } from "./CashTransactionHistory";
 
@@ -13,11 +13,12 @@ function formatCurrency(amount: number) {
   }).format(amount);
 }
 
-function StatusBadge({ status }: { status: "active" | "closed" }) {
+/** Binds the account-status testid, so both render sites stay selectable alike. */
+function AccountStatusBadge({ status }: { status: "active" | "closed" }) {
   return (
-    <Badge tone={statusTone(status)} testId="status-badge">
+    <StatusBadge tone={statusTone(status)} testId="status-badge">
       {status}
-    </Badge>
+    </StatusBadge>
   );
 }
 
@@ -104,7 +105,7 @@ function CashAccountDetail({ account }: { account: CashAccount }) {
             <span className="capitalize">{account.accountType}</span>
           </p>
         </div>
-        <StatusBadge status={account.status} />
+        <AccountStatusBadge status={account.status} />
       </div>
 
       {/* Balance card */}
@@ -160,7 +161,7 @@ function InvestmentAccountDetail({ account }: { account: InvestmentAccount }) {
           </h1>
           <p className="mt-1 text-sm text-gray-500">{account.accountNumber}</p>
         </div>
-        <StatusBadge status={account.status} />
+        <AccountStatusBadge status={account.status} />
       </div>
 
       {/* Portfolio value card */}

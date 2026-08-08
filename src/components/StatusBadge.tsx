@@ -1,9 +1,16 @@
+import { Badge } from "~/components/ui/badge";
+import { cn } from "~/lib/utils";
+
 /**
  * The one pill-shaped label used across the app.
  *
  * Badges previously carried hand-written Tailwind at each call site, which is
  * how they drifted into a mix of "savings", "Investment" and "0 pending".
  * Anything badge-shaped should come from here.
+ *
+ * Rendering goes through shadcn's Badge; this file owns only the mapping from
+ * meaning to colour. That split is deliberate — `ui/badge.tsx` stays untouched
+ * so `shadcn add badge` can be re-run without clobbering the tones below.
  */
 
 export type BadgeTone =
@@ -14,13 +21,17 @@ export type BadgeTone =
   | "info" // cash account types
   | "accent"; // investment, admin
 
+/**
+ * Tones name a meaning, not a colour, and resolve through theme tokens — so a
+ * theme is free to render "positive" as something other than green.
+ */
 const TONE_CLASSES: Record<BadgeTone, string> = {
-  neutral: "bg-gray-100 text-gray-600",
-  positive: "bg-green-100 text-green-800",
-  warning: "bg-yellow-100 text-yellow-800",
-  danger: "bg-red-100 text-red-800",
-  info: "bg-blue-100 text-blue-800",
-  accent: "bg-purple-100 text-purple-800",
+  neutral: "bg-tone-neutral text-tone-neutral-foreground",
+  positive: "bg-tone-positive text-tone-positive-foreground",
+  warning: "bg-tone-warning text-tone-warning-foreground",
+  danger: "bg-tone-danger text-tone-danger-foreground",
+  info: "bg-tone-info text-tone-info-foreground",
+  accent: "bg-tone-accent text-tone-accent-foreground",
 };
 
 /**
@@ -53,7 +64,7 @@ export function statusTone(status: string): BadgeTone {
   }
 }
 
-export function Badge({
+export function StatusBadge({
   children,
   tone = "neutral",
   testId,
@@ -66,12 +77,12 @@ export function Badge({
   title?: string;
 }) {
   return (
-    <span
+    <Badge
       data-testid={testId}
       title={title}
-      className={`inline-block rounded-full px-2 py-1 text-xs font-medium whitespace-nowrap ${TONE_CLASSES[tone]}`}
+      className={cn("border-transparent", TONE_CLASSES[tone])}
     >
       {sentenceCase(children)}
-    </span>
+    </Badge>
   );
 }
