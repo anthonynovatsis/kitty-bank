@@ -28,6 +28,13 @@
       "when": 1786238316365,
       "tag": "0003_money_as_integer_cents",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1786261069438,
+      "tag": "0004_whole_share_quantities",
+      "breakpoints": true
     }
   ]
 }

@@ -1,5 +1,5 @@
 import { relations, sql } from "drizzle-orm";
-import { index, sqliteTable } from "drizzle-orm/sqlite-core";
+import { check, index, sqliteTable } from "drizzle-orm/sqlite-core";
 import { cents, type Cents } from "~/lib/money";
 
 // Better Auth core tables
@@ -207,11 +207,17 @@ export const holdings = sqliteTable(
     symbol: d.text({ length: 20 }).notNull(),
     companyName: d.text({ length: 255 }),
     /*
-     * A share count, not money — deliberately not scaled to minor units. Splits
-     * can produce fractional quantities, and the right precision for that is a
-     * Phase 3 decision. Everything monetary alongside it is integer cents.
+     * A share count, not money — so not scaled to minor units the way every
+     * monetary column is. Whole shares only: a corporate action that would
+     * leave a fraction settles the remainder to cash instead, which is the
+     * same pattern DRIP already uses for its dividend remainder.
+     *
+     * The CHECK is doing real work. SQLite's INTEGER is a declaration, not a
+     * constraint — it stores 7.5 quite happily — so the constraint is what
+     * actually stops a fraction. Affinity converts a lossless 7.0 to 7 first,
+     * so only genuine fractions are rejected.
      */
-    quantity: d.real().notNull(),
+    quantity: d.integer().notNull(),
     averageCostBasis: d.integer().$type<Cents>().notNull(),
     dividendReinvestment: d
       .integer({ mode: "boolean" })
@@ -228,6 +234,7 @@ export const holdings = sqliteTable(
   (t) => [
     index("holdings_investment_account_id_idx").on(t.investmentAccountId),
     index("holdings_symbol_idx").on(t.symbol),
+    check("holdings_quantity_whole", sql`typeof(${t.quantity}) = 'integer'`),
   ],
 );
 
@@ -248,7 +255,7 @@ export const investmentTransactions = sqliteTable(
       .notNull()
       .$type<"buy" | "sell" | "dividend_reinvest" | "split">(),
     symbol: d.text({ length: 20 }).notNull(),
-    quantity: d.real(),
+    quantity: d.integer(),
     price: d.integer().$type<Cents>(),
     amount: d.integer().$type<Cents>().notNull(),
     brokerage: d.integer().$type<Cents>().notNull().default(cents(0)),
@@ -275,6 +282,12 @@ export const investmentTransactions = sqliteTable(
     index("investment_transactions_symbol_idx").on(t.symbol),
     index("investment_transactions_status_idx").on(t.status),
     index("investment_transactions_created_by_idx").on(t.createdByUserId),
+    // Nullable here (splits may not carry one), so only non-null values are
+    // constrained — `typeof(NULL)` is 'null' and would otherwise fail.
+    check(
+      "investment_transactions_quantity_whole",
+      sql`${t.quantity} IS NULL OR typeof(${t.quantity}) = 'integer'`,
+    ),
   ],
 );
 

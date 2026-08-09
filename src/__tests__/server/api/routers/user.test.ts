@@ -1,5 +1,6 @@
 import { describe, it, expect, assert, beforeAll } from "vitest";
 import { TRPCError } from "@trpc/server";
+import { eq } from "drizzle-orm";
 import { holdings } from "~/server/db/schema";
 import { createTestDb } from "../../../helpers/db";
 import { cents } from "~/lib/money";
@@ -109,6 +110,43 @@ describe("user.accounts.list", () => {
     const result = await caller.user.accounts.list();
     expect(result.cashAccounts[0]!.type).toBe("cash");
     expect(result.investmentAccounts[0]!.type).toBe("investment");
+  });
+
+  /*
+   * Holdings are whole shares: a corporate action that would leave a fraction
+   * settles the remainder to cash instead. SQLite's INTEGER is a declaration
+   * rather than a constraint — it stores 7.5 without complaint — so the CHECK
+   * is the only thing actually enforcing that, and this proves it does.
+   */
+  it("refuses a fractional share quantity at the database", async () => {
+    const caller = createTestCaller(db, makeSession(user1));
+    const portfolio = (await caller.user.accounts.list())
+      .investmentAccounts[0]!;
+
+    await expect(
+      db.insert(holdings).values({
+        investmentAccountId: portfolio.id,
+        symbol: "FRAC",
+        quantity: 7.5,
+        averageCostBasis: cents(100_00),
+      }),
+    ).rejects.toThrow(/CHECK constraint failed/i);
+
+    // A whole quantity written as a float is fine: SQLite's affinity converts
+    // a lossless 7.0 to 7 before the constraint is evaluated.
+    await db.insert(holdings).values({
+      investmentAccountId: portfolio.id,
+      symbol: "WHOLE",
+      quantity: 7.0,
+      averageCostBasis: cents(100_00),
+    });
+
+    const stored = await db.query.holdings.findFirst({
+      where: (h, { eq }) => eq(h.symbol, "WHOLE"),
+    });
+    expect(stored?.quantity).toBe(7);
+
+    await db.delete(holdings).where(eq(holdings.symbol, "WHOLE"));
   });
 
   it("calculates investment account totalValue from holdings", async () => {

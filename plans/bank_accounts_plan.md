@@ -364,9 +364,22 @@ error in a way that deposits and withdrawals do not. Storing total cost and
 total quantity, and deriving the average only for display, avoids accumulating
 any error at all.
 
-`holdings.quantity` is a share count rather than money and is still a float.
-Splits can fraction it, so its precision is a Phase 3 decision in its own
-right.
+`holdings.quantity` is a share count rather than money, so it is a plain
+integer rather than scaled minor units. **Whole shares only:** a corporate
+action that would leave a fraction settles the remainder to cash, the same
+pattern DRIP already uses for its dividend remainder. Cash-in-lieu is not built
+— it is a feature in its own right, for whenever a real split needs it.
+
+Enforcement is a CHECK constraint (`typeof(quantity) = 'integer'`), not the
+column type. SQLite's INTEGER is a declaration and stores 7.5 without
+complaint, so the constraint is the only thing that actually stops a fraction;
+affinity converts a lossless 7.0 to 7 first, so only genuine fractions are
+rejected. Covered by a test.
+
+Phase 3 owes this a friendly error: a split that does not divide evenly should
+be refused with its own error `kind` rather than reaching the database and
+failing on the constraint. Widening to fractional shares later is a lossless
+multiply, so starting whole is the reversible direction.
 
 Balance changes are issued as `balance = balance ± ?` with the funds check in
 the same `WHERE` clause, and the row count decides success. The investment
