@@ -62,6 +62,22 @@ Service functions take a `Transaction` (exported from `src/server/db/index.ts`)
 rather than the root `db`, so callers must wrap them in `ctx.db.transaction()`.
 That is what stops a transfer from debiting without crediting.
 
+**Money is integer cents.** Never a float, never a decimal string. `Cents` in
+`src/lib/money.ts` is a branded number, so a decimal cannot be stored as an
+amount and `formatCents` cannot be handed one. Arithmetic on two `Cents` yields
+a plain `number` — re-brand with `cents()` or total with `sumCents()`. Decimals
+exist in exactly two places: `toCents` at the tRPC input boundary and
+`formatCents` at the point of display. `quantity` on holdings is a share count,
+not money, and is deliberately exempt.
+
+**Balance changes happen in SQL, not in JavaScript.** `moveBalance` in `cash.ts`
+issues `balance = balance ± ?` with the funds check in the same `WHERE`, so
+checking funds and spending them cannot be separated. Do not read a balance,
+compute a new one and write it back: SQLite serialises writers so it looks
+safe, but under a database allowing concurrent writers two settlements can each
+read the same balance and one update is lost. The test suite is single-threaded
+and will not catch it.
+
 **Service errors** carry a machine-readable `kind`, because one procedure can
 refuse for several reasons that share a tRPC code. Throw with
 `cashError(kind, message)` and branch with `isCashError(err, kind)` — never by

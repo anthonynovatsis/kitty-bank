@@ -1,7 +1,7 @@
 import { TRPCError } from "@trpc/server";
-import { eq } from "drizzle-orm";
+import { and, eq, gte, sql, type SQL } from "drizzle-orm";
 
-import { cents, formatCents, type Cents } from "~/lib/money";
+import { formatCents, type Cents } from "~/lib/money";
 import type { Transaction } from "~/server/db";
 import { cashAccounts, userSettings } from "~/server/db/schema";
 
@@ -138,19 +138,74 @@ export function assertSufficientFunds(
   }
 }
 
-async function setBalance(tx: Transaction, accountId: string, balance: Cents) {
-  await tx
+/**
+ * Credit or debit an account's balance, atomically.
+ *
+ * The arithmetic happens in the database — `balance = balance + ?` — rather
+ * than in JavaScript from a value read a moment earlier. A read-modify-write
+ * is only safe here because SQLite serialises writers; under a database that
+ * allows concurrent writers to read the same row (Postgres at READ COMMITTED,
+ * say) two settlements could each read 100, each write 150, and one deposit
+ * would silently vanish. No test would catch that, because the suite is
+ * single-threaded.
+ *
+ * `guard` is applied in the same statement as the write, so checking funds and
+ * spending them cannot be separated. Returns false when nothing matched.
+ */
+async function moveBalance(
+  tx: Transaction,
+  accountId: string,
+  direction: "credit" | "debit",
+  amount: Cents,
+  guard?: SQL,
+): Promise<boolean> {
+  const result = await tx
     .update(cashAccounts)
-    .set({ balance })
-    .where(eq(cashAccounts.id, accountId));
+    .set({
+      balance:
+        direction === "credit"
+          ? sql`${cashAccounts.balance} + ${amount}`
+          : sql`${cashAccounts.balance} - ${amount}`,
+    })
+    .where(
+      and(
+        eq(cashAccounts.id, accountId),
+        eq(cashAccounts.status, "active"),
+        ...(guard ? [guard] : []),
+      ),
+    );
+
+  return result.rowsAffected > 0;
+}
+
+/**
+ * Explain why a move matched no rows.
+ *
+ * Only ever called on the failure path, so the happy path stays a single
+ * statement with no read at all. Re-running the assertions here keeps the
+ * error `kind`s identical to what callers already branch on.
+ */
+async function explainFailedMove(
+  tx: Transaction,
+  accountId: string,
+  amount: Cents,
+): Promise<never> {
+  const account = await loadCashAccount(tx, accountId);
+  assertActive(account);
+  assertSufficientFunds(account, amount);
+  // Active, funded, and still nothing moved: the row changed underneath us.
+  throw cashError(
+    "insufficient_funds",
+    `Could not settle against "${account.accountName}"`,
+  );
 }
 
 /**
  * Apply a transaction's effect to account balances.
  *
- * Re-reads and re-validates the accounts, so it is safe to call at approval
- * time: a pending withdrawal does *not* reserve funds, and the account may have
- * been drained or closed while the request sat in the queue.
+ * Safe to call at approval time: a pending withdrawal does *not* reserve
+ * funds, so the account may have been drained or closed while the request sat
+ * in the queue. Both conditions are re-checked as part of the write itself.
  */
 export async function settleCashMovement(
   tx: Transaction,
@@ -160,17 +215,25 @@ export async function settleCashMovement(
 
   switch (movement.transactionType) {
     case "deposit": {
-      const account = await loadCashAccount(tx, movement.cashAccountId);
-      assertActive(account);
-      await setBalance(tx, account.id, cents(account.balance + amount));
+      const moved = await moveBalance(
+        tx,
+        movement.cashAccountId,
+        "credit",
+        amount,
+      );
+      if (!moved) await explainFailedMove(tx, movement.cashAccountId, amount);
       return;
     }
 
     case "withdrawal": {
-      const account = await loadCashAccount(tx, movement.cashAccountId);
-      assertActive(account);
-      assertSufficientFunds(account, amount);
-      await setBalance(tx, account.id, cents(account.balance - amount));
+      const moved = await moveBalance(
+        tx,
+        movement.cashAccountId,
+        "debit",
+        amount,
+        gte(cashAccounts.balance, amount),
+      );
+      if (!moved) await explainFailedMove(tx, movement.cashAccountId, amount);
       return;
     }
 
@@ -183,14 +246,26 @@ export async function settleCashMovement(
         );
       }
 
-      const from = await loadCashAccount(tx, fromAccountId);
-      const to = await loadCashAccount(tx, toAccountId);
-      assertActive(from);
-      assertActive(to);
-      assertSufficientFunds(from, amount);
+      /*
+       * Debit first, and only credit if it succeeded. Both statements share
+       * the caller's transaction, so a failed credit rolls the debit back.
+       *
+       * Ordering note for a future Postgres migration: two simultaneous
+       * transfers in opposite directions can deadlock if they lock rows in
+       * different orders. Touching the source first is consistent but not
+       * sufficient — sorting by id would be.
+       */
+      const debited = await moveBalance(
+        tx,
+        fromAccountId,
+        "debit",
+        amount,
+        gte(cashAccounts.balance, amount),
+      );
+      if (!debited) await explainFailedMove(tx, fromAccountId, amount);
 
-      await setBalance(tx, from.id, cents(from.balance - amount));
-      await setBalance(tx, to.id, cents(to.balance + amount));
+      const credited = await moveBalance(tx, toAccountId, "credit", amount);
+      if (!credited) await explainFailedMove(tx, toAccountId, amount);
       return;
     }
   }

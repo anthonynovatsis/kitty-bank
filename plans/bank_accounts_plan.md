@@ -354,6 +354,26 @@ This document outlines the plan to add bank account management functionality to 
 - `interest` and `fee` transaction types exist in the schema but no procedure
   can create them yet; settling one throws.
 
+**Money and concurrency (established here, applies to future services):**
+
+Amounts are integer cents throughout, typed as `Cents` (a branded number in
+`src/lib/money.ts`). Phase 3 is the reason: average cost basis divides and
+stores the result, DRIP carries a fractional remainder forward indefinitely,
+and realised gain subtracts near-equal numbers — all of which compound float
+error in a way that deposits and withdrawals do not. Storing total cost and
+total quantity, and deriving the average only for display, avoids accumulating
+any error at all.
+
+`holdings.quantity` is a share count rather than money and is still a float.
+Splits can fraction it, so its precision is a Phase 3 decision in its own
+right.
+
+Balance changes are issued as `balance = balance ± ?` with the funds check in
+the same `WHERE` clause, and the row count decides success. The investment
+service must do the same when a buy debits a cash account — a read-modify-write
+is only safe because SQLite serialises writers, and nothing in the test suite
+would reveal the difference.
+
 **Error convention (established here, applies to future services):**
 
 A single procedure can refuse for several different reasons that share one tRPC
