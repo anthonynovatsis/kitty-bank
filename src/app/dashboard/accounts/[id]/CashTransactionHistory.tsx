@@ -3,13 +3,7 @@
 import { api } from "~/trpc/react";
 import { StatusBadge, statusTone } from "~/components/StatusBadge";
 import { TableSkeleton } from "~/components/Skeletons";
-
-function formatCurrency(amount: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(amount);
-}
+import { formatCents } from "~/lib/money";
 
 export function CashTransactionHistory({ accountId }: { accountId: string }) {
   const { data, isLoading } = api.user.cash.getTransactions.useQuery({
@@ -73,7 +67,7 @@ export function CashTransactionHistory({ accountId }: { accountId: string }) {
                     }`}
                   >
                     {transaction.direction === "credit" ? "+" : "−"}
-                    {formatCurrency(transaction.amount)}
+                    {formatCents(transaction.amount)}
                   </td>
                   <td className="py-3">
                     <StatusBadge

@@ -6,13 +6,7 @@ import { StatusBadge } from "~/components/StatusBadge";
 import { Button } from "~/components/ui/button";
 import { EmptyState } from "~/components/ThemeIllustration";
 import { TableSkeleton } from "~/components/Skeletons";
-
-function formatCurrency(amount: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(amount);
-}
+import { formatCents } from "~/lib/money";
 
 export function PendingTransactions() {
   const [error, setError] = useState<string | null>(null);
@@ -139,8 +133,7 @@ export function PendingTransactions() {
                           </p>
                         )}
                       <p className="text-muted-foreground text-xs">
-                        Balance:{" "}
-                        {formatCurrency(transaction.cashAccount.balance)}
+                        Balance: {formatCents(transaction.cashAccount.balance)}
                       </p>
                     </td>
                     <td className="py-3 pr-4">
@@ -150,7 +143,7 @@ export function PendingTransactions() {
                       data-testid="pending-transaction-amount"
                       className="py-3 pr-4 text-right font-medium"
                     >
-                      {formatCurrency(transaction.amount)}
+                      {formatCents(transaction.amount)}
                     </td>
                     <td className="py-3">
                       <div className="flex gap-2">

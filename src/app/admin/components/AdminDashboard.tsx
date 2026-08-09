@@ -8,6 +8,7 @@ import { CreateAccountDialog } from "./CreateAccountDialog";
 import { PendingTransactions } from "./PendingTransactions";
 import { EmptyState } from "~/components/ThemeIllustration";
 import { CardGridSkeleton } from "~/components/Skeletons";
+import { cents, formatCents, sumCents } from "~/lib/money";
 
 export function AdminDashboard() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -29,13 +30,6 @@ export function AdminDashboard() {
     api.admin.users.updateApprovalSettings.useMutation({
       onSuccess: () => void refetchUsers(),
     });
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-    }).format(amount);
-  };
 
   const handleAccountCreated = () => {
     void refetchAccounts();
@@ -97,9 +91,7 @@ export function AdminDashboard() {
               <div className="text-2xl font-bold">{cashAccounts.length}</div>
               <p className="text-muted-foreground mt-1 text-sm">
                 Total Balance:{" "}
-                {formatCurrency(
-                  cashAccounts.reduce((sum, acc) => sum + acc.balance, 0),
-                )}
+                {formatCents(sumCents(cashAccounts, (acc) => acc.balance))}
               </p>
             </div>
             <div className="bg-card rounded-lg p-6 shadow">
@@ -111,11 +103,8 @@ export function AdminDashboard() {
               </div>
               <p className="text-muted-foreground mt-1 text-sm">
                 Total Value:{" "}
-                {formatCurrency(
-                  investmentAccounts.reduce(
-                    (sum, acc) => sum + acc.totalValue,
-                    0,
-                  ),
+                {formatCents(
+                  sumCents(investmentAccounts, (acc) => acc.totalValue),
                 )}
               </p>
             </div>
@@ -124,12 +113,11 @@ export function AdminDashboard() {
                 Total Net Worth
               </h3>
               <div className="text-2xl font-bold">
-                {formatCurrency(
-                  cashAccounts.reduce((sum, acc) => sum + acc.balance, 0) +
-                    investmentAccounts.reduce(
-                      (sum, acc) => sum + acc.totalValue,
-                      0,
-                    ),
+                {formatCents(
+                  cents(
+                    sumCents(cashAccounts, (acc) => acc.balance) +
+                      sumCents(investmentAccounts, (acc) => acc.totalValue),
+                  ),
                 )}
               </div>
             </div>
@@ -152,7 +140,7 @@ export function AdminDashboard() {
                     </div>
                     <div className="text-right">
                       <p className="font-medium">
-                        {formatCurrency(account.balance)}
+                        {formatCents(account.balance)}
                       </p>
                       <StatusBadge tone={statusTone(account.status)}>
                         {account.status}
@@ -181,7 +169,7 @@ export function AdminDashboard() {
                     </div>
                     <div className="text-right">
                       <p className="font-medium">
-                        {formatCurrency(account.totalValue)}
+                        {formatCents(account.totalValue)}
                       </p>
                       <StatusBadge tone={statusTone(account.status)}>
                         {account.status}
@@ -222,7 +210,7 @@ export function AdminDashboard() {
                   </div>
                   <div className="text-right">
                     <p className="text-lg font-medium">
-                      {formatCurrency(account.balance)}
+                      {formatCents(account.balance)}
                     </p>
                     <StatusBadge tone={statusTone(account.status)}>
                       {account.status}
@@ -262,7 +250,7 @@ export function AdminDashboard() {
                   </div>
                   <div className="text-right">
                     <p className="text-lg font-medium">
-                      {formatCurrency(account.totalValue)}
+                      {formatCents(account.totalValue)}
                     </p>
                     <StatusBadge tone={statusTone(account.status)}>
                       {account.status}
@@ -326,7 +314,7 @@ export function AdminDashboard() {
                         )}
                       </td>
                       <td className="py-3 pr-4">
-                        {formatCurrency(user.totalCashBalance)}
+                        {formatCents(user.totalCashBalance)}
                       </td>
                       <td className="py-3 pr-4">
                         <StatusBadge

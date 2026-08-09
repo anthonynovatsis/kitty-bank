@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
+import { formatCents, type Cents } from "~/lib/money";
 
 type Mode = "deposit" | "withdraw" | "transfer";
 
@@ -45,7 +46,7 @@ export function CashTransactionForms({
   balance,
 }: {
   accountId: string;
-  balance: number;
+  balance: Cents;
 }) {
   const [mode, setMode] = useState<Mode>("deposit");
   const [amount, setAmount] = useState("");
@@ -191,7 +192,7 @@ export function CashTransactionForms({
           />
           {mode !== "deposit" && (
             <p className="text-muted-foreground mt-1 text-xs">
-              Available: ${balance.toFixed(2)}
+              Available: {formatCents(balance)}
             </p>
           )}
         </div>

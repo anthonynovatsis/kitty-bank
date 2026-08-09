@@ -1,6 +1,7 @@
 import { desc, eq, inArray, or } from "drizzle-orm";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
+import { MAX_AMOUNT_CENTS, sumCents, toCents } from "~/lib/money";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import {
   type SettleableType,
@@ -9,7 +10,6 @@ import {
   cashError,
   loadCashAccount,
   requiresApproval,
-  roundToCents,
   settleCashMovement,
 } from "~/server/services/cash";
 import type { Transaction } from "~/server/db";
@@ -22,11 +22,16 @@ import {
 /** Money in, money out, or moved — as seen from one specific account. */
 type Direction = "credit" | "debit";
 
+/*
+ * Input stays a decimal amount, as typed. The server converts to cents at this
+ * boundary so the rounding rule is ours, not the client's — after that nothing
+ * on the server sees a fraction.
+ */
 const amountSchema = z
   .number()
   .positive("Amount must be greater than zero")
   .finite()
-  .max(1_000_000_000, "Amount is too large");
+  .max(MAX_AMOUNT_CENTS / 100, "Amount is too large");
 
 const descriptionSchema = z.string().trim().max(500).optional();
 
@@ -114,9 +119,10 @@ export const userRouter = createTRPCRouter({
         investmentAccounts: investmentAccs.map((acc) => ({
           ...acc,
           type: "investment" as const,
-          totalValue: acc.holdings.reduce(
-            (sum, holding) => sum + holding.quantity * holding.averageCostBasis,
-            0,
+          // quantity is a share count, not money, so each product is rounded
+          // back to whole cents rather than left fractional.
+          totalValue: sumCents(acc.holdings, (holding) =>
+            Math.round(holding.quantity * holding.averageCostBasis),
           ),
           holdingsCount: acc.holdings.length,
         })),
@@ -158,9 +164,8 @@ export const userRouter = createTRPCRouter({
             type: "investment" as const,
             account: {
               ...investmentAccount,
-              totalValue: investmentAccount.holdings.reduce(
-                (sum, h) => sum + h.quantity * h.averageCostBasis,
-                0,
+              totalValue: sumCents(investmentAccount.holdings, (h) =>
+                Math.round(h.quantity * h.averageCostBasis),
               ),
             },
           };
@@ -220,7 +225,7 @@ export const userRouter = createTRPCRouter({
           // Fail fast rather than queueing a request that can never settle.
           // Funds are *not* reserved while pending — the balance is checked
           // again at approval time.
-          assertSufficientFunds(account, roundToCents(input.amount));
+          assertSufficientFunds(account, toCents(input.amount));
 
           return submitCashTransaction(tx, {
             transactionType: "withdrawal",
@@ -263,7 +268,7 @@ export const userRouter = createTRPCRouter({
           assertActive(from);
           assertActive(to);
 
-          assertSufficientFunds(from, roundToCents(input.amount));
+          assertSufficientFunds(from, toCents(input.amount));
 
           return submitCashTransaction(tx, {
             transactionType: "transfer",
@@ -382,7 +387,7 @@ async function submitCashTransaction(
     userId: string;
   },
 ) {
-  const amount = roundToCents(input.amount);
+  const amount = toCents(input.amount);
   const needsApproval = await requiresApproval(tx, input.userId);
 
   const [transaction] = await tx

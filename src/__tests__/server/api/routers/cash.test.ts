@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { cashAccounts, cashTransactions } from "~/server/db/schema";
 import { isCashError, type CashErrorKind } from "~/server/services/cash";
 import { createTestDb, type TestDb } from "../../../helpers/db";
+import { cents, type Cents } from "~/lib/money";
 import {
   insertAdminUser,
   insertUser,
@@ -30,12 +31,12 @@ async function expectCashError(promise: Promise<unknown>, kind: CashErrorKind) {
   expect(isCashError(error, kind)).toBe(true);
 }
 
-/** Create a cash account for a user with a known starting balance. */
+/** Create a cash account for a user with a known starting balance, in cents. */
 async function makeCashAccount(
   db: TestDb,
   admin: FakeUser,
   userId: string,
-  opts: { name: string; balance?: number; status?: "active" | "closed" },
+  opts: { name: string; balance?: Cents; status?: "active" | "closed" },
 ) {
   const adminCaller = createTestCaller(db, makeSession(admin));
   const { account } = await adminCaller.admin.accounts.create({
@@ -49,7 +50,9 @@ async function makeCashAccount(
     await db
       .update(cashAccounts)
       .set({
-        ...(opts.balance !== undefined && { balance: opts.balance }),
+        ...(opts.balance !== undefined && {
+          balance: opts.balance,
+        }),
         ...(opts.status !== undefined && { status: opts.status }),
       })
       .where(eq(cashAccounts.id, account!.id));
@@ -132,7 +135,7 @@ describe("cash rule errors", () => {
   it("distinguishes the ways a single procedure can refuse", async () => {
     const open = await makeCashAccount(db, admin, trusted.id, {
       name: "Rule Open",
-      balance: 10,
+      balance: cents(1000),
     });
     const otherOpen = await makeCashAccount(db, admin, trusted.id, {
       name: "Rule Other",
@@ -168,7 +171,7 @@ describe("cash rule errors", () => {
   it("maps state refusals to CONFLICT and malformed input to BAD_REQUEST", async () => {
     const account = await makeCashAccount(db, admin, trusted.id, {
       name: "Rule Codes",
-      balance: 5,
+      balance: cents(500),
     });
     const caller = createTestCaller(db, makeSession(trusted));
 
@@ -229,7 +232,7 @@ describe("user.cash.deposit", () => {
 
     expect(result.status).toBe("completed");
     expect(result.requiresApproval).toBe(false);
-    expect(await balanceOf(db, accountId)).toBe(250.5);
+    expect(await balanceOf(db, accountId)).toBe(25050);
   });
 
   it("queues the transaction without moving money for a supervised user", async () => {
@@ -268,7 +271,7 @@ describe("user.cash.deposit", () => {
     await caller.user.cash.deposit({ accountId, amount: 0.2 });
 
     // 0.1 + 0.2 is 0.30000000000000004 in binary floating point
-    expect(await balanceOf(db, accountId)).toBe(0.3);
+    expect(await balanceOf(db, accountId)).toBe(30);
   });
 
   it("rejects a zero amount", async () => {
@@ -361,7 +364,7 @@ describe("user.cash.withdraw", () => {
   it("debits the balance immediately for a trusted user", async () => {
     const accountId = await makeCashAccount(db, admin, trusted.id, {
       name: "Withdrawable",
-      balance: 500,
+      balance: cents(50000),
     });
     const caller = createTestCaller(db, makeSession(trusted));
 
@@ -371,13 +374,13 @@ describe("user.cash.withdraw", () => {
     });
 
     expect(result.status).toBe("completed");
-    expect(await balanceOf(db, accountId)).toBe(379.75);
+    expect(await balanceOf(db, accountId)).toBe(37975);
   });
 
   it("allows withdrawing the exact balance", async () => {
     const accountId = await makeCashAccount(db, admin, trusted.id, {
       name: "Exact",
-      balance: 75.5,
+      balance: cents(7550),
     });
     const caller = createTestCaller(db, makeSession(trusted));
 
@@ -389,7 +392,7 @@ describe("user.cash.withdraw", () => {
   it("rejects a withdrawal larger than the balance", async () => {
     const accountId = await makeCashAccount(db, admin, trusted.id, {
       name: "Overdraft",
-      balance: 40,
+      balance: cents(4000),
     });
     const caller = createTestCaller(db, makeSession(trusted));
 
@@ -397,13 +400,13 @@ describe("user.cash.withdraw", () => {
       caller.user.cash.withdraw({ accountId, amount: 40.01 }),
       "insufficient_funds",
     );
-    expect(await balanceOf(db, accountId)).toBe(40);
+    expect(await balanceOf(db, accountId)).toBe(4000);
   });
 
   it("does not record a transaction when funds are insufficient", async () => {
     const accountId = await makeCashAccount(db, admin, trusted.id, {
       name: "No Record",
-      balance: 10,
+      balance: cents(1000),
     });
     const caller = createTestCaller(db, makeSession(trusted));
 
@@ -421,14 +424,14 @@ describe("user.cash.withdraw", () => {
   it("queues without debiting for a supervised user", async () => {
     const accountId = await makeCashAccount(db, admin, supervised.id, {
       name: "Supervised Withdrawal",
-      balance: 300,
+      balance: cents(30000),
     });
     const caller = createTestCaller(db, makeSession(supervised));
 
     const result = await caller.user.cash.withdraw({ accountId, amount: 100 });
 
     expect(result.status).toBe("pending");
-    expect(await balanceOf(db, accountId)).toBe(300);
+    expect(await balanceOf(db, accountId)).toBe(30000);
   });
 });
 
@@ -454,11 +457,11 @@ describe("user.cash.transfer", () => {
   it("moves money between two of the user's own accounts", async () => {
     const from = await makeCashAccount(db, admin, trusted.id, {
       name: "From",
-      balance: 1000,
+      balance: cents(100000),
     });
     const to = await makeCashAccount(db, admin, trusted.id, {
       name: "To",
-      balance: 25,
+      balance: cents(2500),
     });
     const caller = createTestCaller(db, makeSession(trusted));
 
@@ -469,14 +472,14 @@ describe("user.cash.transfer", () => {
     });
 
     expect(result.status).toBe("completed");
-    expect(await balanceOf(db, from)).toBe(600);
-    expect(await balanceOf(db, to)).toBe(425);
+    expect(await balanceOf(db, from)).toBe(60000);
+    expect(await balanceOf(db, to)).toBe(42500);
   });
 
   it("rejects a transfer to the same account", async () => {
     const accountId = await makeCashAccount(db, admin, trusted.id, {
       name: "Self",
-      balance: 100,
+      balance: cents(10000),
     });
     const caller = createTestCaller(db, makeSession(trusted));
 
@@ -488,17 +491,17 @@ describe("user.cash.transfer", () => {
       }),
       "invalid_transfer",
     );
-    expect(await balanceOf(db, accountId)).toBe(100);
+    expect(await balanceOf(db, accountId)).toBe(10000);
   });
 
   it("throws FORBIDDEN when the destination belongs to another user", async () => {
     const from = await makeCashAccount(db, admin, trusted.id, {
       name: "Mine",
-      balance: 500,
+      balance: cents(50000),
     });
     const to = await makeCashAccount(db, admin, stranger.id, {
       name: "Theirs",
-      balance: 0,
+      balance: cents(0),
     });
     const caller = createTestCaller(db, makeSession(trusted));
 
@@ -510,18 +513,18 @@ describe("user.cash.transfer", () => {
       }),
       "FORBIDDEN",
     );
-    expect(await balanceOf(db, from)).toBe(500);
+    expect(await balanceOf(db, from)).toBe(50000);
     expect(await balanceOf(db, to)).toBe(0);
   });
 
   it("rejects a transfer larger than the source balance", async () => {
     const from = await makeCashAccount(db, admin, trusted.id, {
       name: "Small",
-      balance: 20,
+      balance: cents(2000),
     });
     const to = await makeCashAccount(db, admin, trusted.id, {
       name: "Target",
-      balance: 0,
+      balance: cents(0),
     });
     const caller = createTestCaller(db, makeSession(trusted));
 
@@ -533,18 +536,18 @@ describe("user.cash.transfer", () => {
       }),
       "insufficient_funds",
     );
-    expect(await balanceOf(db, from)).toBe(20);
+    expect(await balanceOf(db, from)).toBe(2000);
     expect(await balanceOf(db, to)).toBe(0);
   });
 
   it("rejects a transfer into a closed account without debiting the source", async () => {
     const from = await makeCashAccount(db, admin, trusted.id, {
       name: "Open Source",
-      balance: 200,
+      balance: cents(20000),
     });
     const to = await makeCashAccount(db, admin, trusted.id, {
       name: "Shut Target",
-      balance: 0,
+      balance: cents(0),
       status: "closed",
     });
     const caller = createTestCaller(db, makeSession(trusted));
@@ -557,18 +560,18 @@ describe("user.cash.transfer", () => {
       }),
       "account_closed",
     );
-    expect(await balanceOf(db, from)).toBe(200);
+    expect(await balanceOf(db, from)).toBe(20000);
     expect(await balanceOf(db, to)).toBe(0);
   });
 
   it("queues without moving money for a supervised user", async () => {
     const from = await makeCashAccount(db, admin, supervised.id, {
       name: "Sup From",
-      balance: 800,
+      balance: cents(80000),
     });
     const to = await makeCashAccount(db, admin, supervised.id, {
       name: "Sup To",
-      balance: 0,
+      balance: cents(0),
     });
     const caller = createTestCaller(db, makeSession(supervised));
 
@@ -579,18 +582,18 @@ describe("user.cash.transfer", () => {
     });
 
     expect(result.status).toBe("pending");
-    expect(await balanceOf(db, from)).toBe(800);
+    expect(await balanceOf(db, from)).toBe(80000);
     expect(await balanceOf(db, to)).toBe(0);
   });
 
   it("records both sides on a single transaction row", async () => {
     const from = await makeCashAccount(db, admin, trusted.id, {
       name: "Row From",
-      balance: 100,
+      balance: cents(10000),
     });
     const to = await makeCashAccount(db, admin, trusted.id, {
       name: "Row To",
-      balance: 0,
+      balance: cents(0),
     });
     const caller = createTestCaller(db, makeSession(trusted));
 
@@ -744,11 +747,11 @@ describe("admin.transactions.pending", () => {
 
     supervisedAccount = await makeCashAccount(db, admin, supervised.id, {
       name: "Queue Account",
-      balance: 500,
+      balance: cents(50000),
     });
     const trustedAccount = await makeCashAccount(db, admin, trusted.id, {
       name: "Auto Account",
-      balance: 500,
+      balance: cents(50000),
     });
 
     await createTestCaller(db, makeSession(supervised)).user.cash.deposit({
@@ -856,13 +859,13 @@ describe("admin.transactions.approve", () => {
     expect(result.status).toBe("completed");
     expect(result.transaction.approvedByAdminId).toBe(admin.id);
     expect(result.transaction.approvedAt).toBeInstanceOf(Date);
-    expect(await balanceOf(db, accountId)).toBe(425.5);
+    expect(await balanceOf(db, accountId)).toBe(42550);
   });
 
   it("rejecting leaves the balance untouched", async () => {
     const accountId = await makeCashAccount(db, admin, supervised.id, {
       name: "Reject Deposit",
-      balance: 60,
+      balance: cents(6000),
     });
     const id = await queueDeposit(accountId, 1000);
 
@@ -874,17 +877,17 @@ describe("admin.transactions.approve", () => {
 
     expect(result.status).toBe("rejected");
     expect(result.transaction.approvedByAdminId).toBe(admin.id);
-    expect(await balanceOf(db, accountId)).toBe(60);
+    expect(await balanceOf(db, accountId)).toBe(6000);
   });
 
   it("approving a transfer moves money on both sides", async () => {
     const from = await makeCashAccount(db, admin, supervised.id, {
       name: "Xfer From",
-      balance: 900,
+      balance: cents(90000),
     });
     const to = await makeCashAccount(db, admin, supervised.id, {
       name: "Xfer To",
-      balance: 100,
+      balance: cents(10000),
     });
 
     const { transaction } = await createTestCaller(
@@ -901,8 +904,8 @@ describe("admin.transactions.approve", () => {
       action: "approve",
     });
 
-    expect(await balanceOf(db, from)).toBe(650);
-    expect(await balanceOf(db, to)).toBe(350);
+    expect(await balanceOf(db, from)).toBe(65000);
+    expect(await balanceOf(db, to)).toBe(35000);
   });
 
   it("refuses to act on a transaction that is no longer pending", async () => {
@@ -925,13 +928,13 @@ describe("admin.transactions.approve", () => {
       "already_decided",
     );
     // Balance credited exactly once.
-    expect(await balanceOf(db, accountId)).toBe(50);
+    expect(await balanceOf(db, accountId)).toBe(5000);
   });
 
   it("fails and rolls back when funds were spent while the request sat pending", async () => {
     const accountId = await makeCashAccount(db, admin, supervised.id, {
       name: "Drained",
-      balance: 100,
+      balance: cents(10000),
     });
 
     const { transaction } = await createTestCaller(
@@ -942,7 +945,7 @@ describe("admin.transactions.approve", () => {
     // Pending withdrawals do not reserve funds — drain the account first.
     await db
       .update(cashAccounts)
-      .set({ balance: 50 })
+      .set({ balance: cents(5000) })
       .where(eq(cashAccounts.id, accountId));
 
     const caller = createTestCaller(db, makeSession(admin));
@@ -955,7 +958,7 @@ describe("admin.transactions.approve", () => {
     );
 
     // Neither the balance nor the status moved.
-    expect(await balanceOf(db, accountId)).toBe(50);
+    expect(await balanceOf(db, accountId)).toBe(5000);
     const row = await db.query.cashTransactions.findFirst({
       where: eq(cashTransactions.id, transaction.id),
     });
@@ -965,7 +968,7 @@ describe("admin.transactions.approve", () => {
   it("fails and rolls back when the account was closed while pending", async () => {
     const accountId = await makeCashAccount(db, admin, supervised.id, {
       name: "Closed While Pending",
-      balance: 500,
+      balance: cents(50000),
     });
 
     const { transaction } = await createTestCaller(
@@ -987,7 +990,7 @@ describe("admin.transactions.approve", () => {
       "account_closed",
     );
 
-    expect(await balanceOf(db, accountId)).toBe(500);
+    expect(await balanceOf(db, accountId)).toBe(50000);
     const row = await db.query.cashTransactions.findFirst({
       where: eq(cashTransactions.id, transaction.id),
     });
@@ -1114,7 +1117,7 @@ describe("transaction dates", () => {
   it("accepts a withdrawal and transfer date too", async () => {
     const from = await makeCashAccount(db, admin, trusted.id, {
       name: "Date From",
-      balance: 500,
+      balance: cents(50000),
     });
     const to = await makeCashAccount(db, admin, trusted.id, {
       name: "Date To",
@@ -1204,7 +1207,7 @@ describe("transaction dates", () => {
     expect(
       Math.floor(result.transaction.transactionDate.getTime() / 1000),
     ).toBe(Math.floor(when.getTime() / 1000));
-    expect(await balanceOf(db, accountId)).toBe(75);
+    expect(await balanceOf(db, accountId)).toBe(7500);
   });
 
   it("exposes the transaction date on the admin queue", async () => {

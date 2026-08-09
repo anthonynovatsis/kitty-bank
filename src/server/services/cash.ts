@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { eq } from "drizzle-orm";
 
+import { cents, formatCents, type Cents } from "~/lib/money";
 import type { Transaction } from "~/server/db";
 import { cashAccounts, userSettings } from "~/server/db/schema";
 
@@ -88,19 +89,8 @@ export type CashMovement = {
   cashAccountId: string;
   fromAccountId: string | null;
   toAccountId: string | null;
-  amount: number;
+  amount: Cents;
 };
-
-/**
- * Balances are stored as SQLite REAL. Round every write to cents so repeated
- * deposits and withdrawals can't accumulate binary-floating-point drift.
- */
-export function roundToCents(amount: number): number {
-  return Math.round(amount * 100) / 100;
-}
-
-/** Cent-level tolerance so a float remainder can't block an exact-balance withdrawal. */
-const EPSILON = 1e-9;
 
 /** True when this user's transactions have to be approved by an admin. */
 export async function requiresApproval(tx: Transaction, userId: string) {
@@ -134,23 +124,24 @@ export function assertActive(account: { accountName: string; status: string }) {
 }
 
 export function assertSufficientFunds(
-  account: { accountName: string; balance: number },
-  amount: number,
+  account: { accountName: string; balance: Cents },
+  amount: Cents,
 ) {
-  if (account.balance + EPSILON < amount) {
+  // Exact: both sides are integers, so there is no tolerance to allow for.
+  if (account.balance < amount) {
     throw cashError(
       "insufficient_funds",
-      `Insufficient funds in "${account.accountName}": balance ${account.balance.toFixed(
-        2,
-      )}, required ${amount.toFixed(2)}`,
+      `Insufficient funds in "${account.accountName}": balance ${formatCents(
+        account.balance,
+      )}, required ${formatCents(amount)}`,
     );
   }
 }
 
-async function setBalance(tx: Transaction, accountId: string, balance: number) {
+async function setBalance(tx: Transaction, accountId: string, balance: Cents) {
   await tx
     .update(cashAccounts)
-    .set({ balance: roundToCents(balance) })
+    .set({ balance })
     .where(eq(cashAccounts.id, accountId));
 }
 
@@ -165,13 +156,13 @@ export async function settleCashMovement(
   tx: Transaction,
   movement: CashMovement,
 ) {
-  const amount = roundToCents(movement.amount);
+  const amount = movement.amount;
 
   switch (movement.transactionType) {
     case "deposit": {
       const account = await loadCashAccount(tx, movement.cashAccountId);
       assertActive(account);
-      await setBalance(tx, account.id, account.balance + amount);
+      await setBalance(tx, account.id, cents(account.balance + amount));
       return;
     }
 
@@ -179,7 +170,7 @@ export async function settleCashMovement(
       const account = await loadCashAccount(tx, movement.cashAccountId);
       assertActive(account);
       assertSufficientFunds(account, amount);
-      await setBalance(tx, account.id, account.balance - amount);
+      await setBalance(tx, account.id, cents(account.balance - amount));
       return;
     }
 
@@ -198,8 +189,8 @@ export async function settleCashMovement(
       assertActive(to);
       assertSufficientFunds(from, amount);
 
-      await setBalance(tx, from.id, from.balance - amount);
-      await setBalance(tx, to.id, to.balance + amount);
+      await setBalance(tx, from.id, cents(from.balance - amount));
+      await setBalance(tx, to.id, cents(to.balance + amount));
       return;
     }
   }

@@ -2,6 +2,7 @@ import { describe, it, expect, assert, beforeAll } from "vitest";
 import { TRPCError } from "@trpc/server";
 import { holdings } from "~/server/db/schema";
 import { createTestDb } from "../../../helpers/db";
+import { cents } from "~/lib/money";
 import {
   insertAdminUser,
   insertUser,
@@ -126,21 +127,21 @@ describe("user.accounts.list", () => {
         investmentAccountId: portfolio.id,
         symbol: "AAPL",
         quantity: 10,
-        averageCostBasis: 150,
+        averageCostBasis: cents(150_00),
       },
       {
         investmentAccountId: portfolio.id,
         symbol: "MSFT",
         quantity: 5,
-        averageCostBasis: 300,
+        averageCostBasis: cents(300_00),
       },
     ]);
 
     const updated = await caller.user.accounts.list();
     const updatedPortfolio = updated.investmentAccounts[0]!;
 
-    // 10 * 150 + 5 * 300 = 1500 + 1500 = 3000
-    expect(updatedPortfolio.totalValue).toBe(3000);
+    // 10 * $150 + 5 * $300 = $1500 + $1500 = $3000
+    expect(updatedPortfolio.totalValue).toBe(3000_00);
     expect(updatedPortfolio.holdingsCount).toBe(2);
   });
 });
@@ -209,7 +210,7 @@ describe("user.accounts.getDetails", () => {
       investmentAccountId,
       symbol: "AAPL",
       quantity: 10,
-      averageCostBasis: 200,
+      averageCostBasis: cents(200_00),
     });
 
     const result = await caller.user.accounts.getDetails({
@@ -218,8 +219,8 @@ describe("user.accounts.getDetails", () => {
     expect(result.type).toBe("investment");
     assert(result.type === "investment");
     expect(result.account.id).toBe(investmentAccountId);
-    // 10 * 200 = 2000
-    expect(result.account.totalValue).toBe(2000);
+    // 10 * $200 = $2000
+    expect(result.account.totalValue).toBe(2000_00);
     expect(result.account.holdings).toHaveLength(1);
     expect(result.account.holdings[0]!.symbol).toBe("AAPL");
   });

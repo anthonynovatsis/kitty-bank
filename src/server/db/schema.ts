@@ -1,5 +1,6 @@
 import { relations, sql } from "drizzle-orm";
 import { index, sqliteTable } from "drizzle-orm/sqlite-core";
+import { cents, type Cents } from "~/lib/money";
 
 // Better Auth core tables
 export const users = sqliteTable("users", (d) => ({
@@ -142,7 +143,7 @@ export const cashAccounts = sqliteTable(
       .text({ length: 50 })
       .notNull()
       .$type<"checking" | "savings">(),
-    balance: d.real().notNull().default(0),
+    balance: d.integer().$type<Cents>().notNull().default(cents(0)),
     status: d
       .text({ length: 50 })
       .notNull()
@@ -205,13 +206,18 @@ export const holdings = sqliteTable(
       .references(() => investmentAccounts.id),
     symbol: d.text({ length: 20 }).notNull(),
     companyName: d.text({ length: 255 }),
+    /*
+     * A share count, not money — deliberately not scaled to minor units. Splits
+     * can produce fractional quantities, and the right precision for that is a
+     * Phase 3 decision. Everything monetary alongside it is integer cents.
+     */
     quantity: d.real().notNull(),
-    averageCostBasis: d.real().notNull(),
+    averageCostBasis: d.integer().$type<Cents>().notNull(),
     dividendReinvestment: d
       .integer({ mode: "boolean" })
       .notNull()
       .default(false),
-    dividendCashBalance: d.real().notNull().default(0),
+    dividendCashBalance: d.integer().$type<Cents>().notNull().default(cents(0)),
     lastTransactionDate: d.integer({ mode: "timestamp" }),
     createdAt: d
       .integer({ mode: "timestamp" })
@@ -243,9 +249,9 @@ export const investmentTransactions = sqliteTable(
       .$type<"buy" | "sell" | "dividend_reinvest" | "split">(),
     symbol: d.text({ length: 20 }).notNull(),
     quantity: d.real(),
-    price: d.real(),
-    amount: d.real().notNull(),
-    brokerage: d.real().notNull().default(0),
+    price: d.integer().$type<Cents>(),
+    amount: d.integer().$type<Cents>().notNull(),
+    brokerage: d.integer().$type<Cents>().notNull().default(cents(0)),
     description: d.text(),
     transactionDate: d.integer({ mode: "timestamp" }).notNull(),
     status: d
@@ -288,7 +294,7 @@ export const cashTransactions = sqliteTable(
       .text({ length: 50 })
       .notNull()
       .$type<"deposit" | "withdrawal" | "transfer" | "interest" | "fee">(),
-    amount: d.real().notNull(),
+    amount: d.integer().$type<Cents>().notNull(),
     description: d.text(),
     // When the money actually moved, which may predate the row: users record
     // historical transactions. `createdAt` remains the audit trail of when the

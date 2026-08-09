@@ -5,6 +5,7 @@ import { api } from "~/trpc/react";
 import { StatusBadge } from "~/components/StatusBadge";
 import { EmptyState, ThemeIllustration } from "~/components/ThemeIllustration";
 import { CardGridSkeleton } from "~/components/Skeletons";
+import { cents, formatCents, sumCents } from "~/lib/money";
 
 export function DashboardContent() {
   const {
@@ -27,16 +28,17 @@ export function DashboardContent() {
     );
   }
 
-  const totalCashBalance =
-    accounts?.cashAccounts.reduce((sum, acc) => sum + acc.balance, 0) ?? 0;
+  const totalCashBalance = sumCents(
+    accounts?.cashAccounts ?? [],
+    (acc) => acc.balance,
+  );
 
-  const totalInvestmentValue =
-    accounts?.investmentAccounts.reduce(
-      (sum, acc) => sum + acc.totalValue,
-      0,
-    ) ?? 0;
+  const totalInvestmentValue = sumCents(
+    accounts?.investmentAccounts ?? [],
+    (acc) => acc.totalValue,
+  );
 
-  const totalNetWorth = totalCashBalance + totalInvestmentValue;
+  const totalNetWorth = cents(totalCashBalance + totalInvestmentValue);
 
   return (
     <>
@@ -46,11 +48,11 @@ export function DashboardContent() {
           Total Net Worth
         </h2>
         <p className="text-tone-positive-foreground text-4xl font-bold">
-          ${totalNetWorth.toFixed(2)}
+          {formatCents(totalNetWorth)}
         </p>
         <div className="text-muted-foreground mt-2 text-sm">
-          <p>Cash: ${totalCashBalance.toFixed(2)}</p>
-          <p>Investments: ${totalInvestmentValue.toFixed(2)}</p>
+          <p>Cash: {formatCents(totalCashBalance)}</p>
+          <p>Investments: {formatCents(totalInvestmentValue)}</p>
         </div>
       </div>
 
@@ -80,7 +82,7 @@ export function DashboardContent() {
               <StatusBadge tone="info">{account.accountType}</StatusBadge>
             </div>
             <p className="text-foreground mt-2 text-2xl font-bold">
-              ${account.balance.toFixed(2)}
+              {formatCents(account.balance)}
             </p>
             <p className="text-muted-foreground text-sm">
               Account: {account.accountNumber}
@@ -108,7 +110,7 @@ export function DashboardContent() {
               <StatusBadge tone="accent">investment</StatusBadge>
             </div>
             <p className="text-foreground mt-2 text-2xl font-bold">
-              ${account.totalValue.toFixed(2)}
+              {formatCents(account.totalValue)}
             </p>
             <p className="text-muted-foreground text-sm">
               {account.holdingsCount} holdings • {account.accountNumber}

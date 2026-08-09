@@ -2,6 +2,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { eq, and, asc, like } from "drizzle-orm";
 import { createTRPCRouter, adminProcedure } from "~/server/api/trpc";
+import { cents, sumCents } from "~/lib/money";
 import {
   assertSettleableType,
   cashError,
@@ -73,10 +74,7 @@ export const adminRouter = createTRPCRouter({
         activeCashAccountCount: user.cashAccounts.filter(
           (a) => a.status === "active",
         ).length,
-        totalCashBalance: user.cashAccounts.reduce(
-          (sum, a) => sum + a.balance,
-          0,
-        ),
+        totalCashBalance: sumCents(user.cashAccounts, (a) => a.balance),
         investmentAccountCount: user.investmentAccounts.length,
         activeInvestmentAccountCount: user.investmentAccounts.filter(
           (a) => a.status === "active",
@@ -169,7 +167,7 @@ export const adminRouter = createTRPCRouter({
               accountNumber,
               accountName: input.accountName,
               accountType: input.cashAccountType,
-              balance: 0,
+              balance: cents(0),
               status: "active",
             })
             .returning();
@@ -265,10 +263,8 @@ export const adminRouter = createTRPCRouter({
           investmentAccounts: investmentAccs.map((acc) => ({
             ...acc,
             type: "investment" as const,
-            totalValue: acc.holdings.reduce(
-              (sum, holding) =>
-                sum + holding.quantity * holding.averageCostBasis,
-              0,
+            totalValue: sumCents(acc.holdings, (holding) =>
+              Math.round(holding.quantity * holding.averageCostBasis),
             ),
           })),
         };

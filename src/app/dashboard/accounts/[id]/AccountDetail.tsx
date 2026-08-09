@@ -7,13 +7,7 @@ import { CashTransactionForms } from "./CashTransactionForms";
 import { CashTransactionHistory } from "./CashTransactionHistory";
 import { EmptyState } from "~/components/ThemeIllustration";
 import { SummarySkeleton } from "~/components/Skeletons";
-
-function formatCurrency(amount: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(amount);
-}
+import { cents, formatCents, type Cents } from "~/lib/money";
 
 /** Binds the account-status testid, so both render sites stay selectable alike. */
 function AccountStatusBadge({ status }: { status: "active" | "closed" }) {
@@ -81,7 +75,7 @@ type CashAccount = {
   accountName: string;
   accountNumber: string;
   accountType: "checking" | "savings";
-  balance: number;
+  balance: Cents;
   status: "active" | "closed";
   createdAt: Date;
 };
@@ -115,7 +109,7 @@ function CashAccountDetail({ account }: { account: CashAccount }) {
           data-testid="account-balance"
           className="text-foreground mt-1 text-4xl font-bold"
         >
-          {formatCurrency(account.balance)}
+          {formatCents(account.balance)}
         </p>
       </div>
 
@@ -136,7 +130,7 @@ type Holding = {
   symbol: string;
   companyName: string | null;
   quantity: number;
-  averageCostBasis: number;
+  averageCostBasis: Cents;
   dividendReinvestment: boolean;
 };
 
@@ -146,7 +140,7 @@ type InvestmentAccount = {
   accountNumber: string;
   status: "active" | "closed";
   createdAt: Date;
-  totalValue: number;
+  totalValue: Cents;
   holdings: Holding[];
 };
 
@@ -172,7 +166,7 @@ function InvestmentAccountDetail({ account }: { account: InvestmentAccount }) {
           Portfolio Value
         </p>
         <p className="text-foreground mt-1 text-4xl font-bold">
-          {formatCurrency(account.totalValue)}
+          {formatCents(account.totalValue)}
         </p>
         <p className="text-muted-foreground mt-1 text-sm">
           {account.holdings.length} holding
@@ -213,11 +207,15 @@ function InvestmentAccountDetail({ account }: { account: InvestmentAccount }) {
                       {holding.quantity.toLocaleString()}
                     </td>
                     <td className="py-3 pr-4 text-right">
-                      {formatCurrency(holding.averageCostBasis)}
+                      {formatCents(holding.averageCostBasis)}
                     </td>
                     <td className="py-3 text-right font-medium">
-                      {formatCurrency(
-                        holding.quantity * holding.averageCostBasis,
+                      {formatCents(
+                        cents(
+                          Math.round(
+                            holding.quantity * holding.averageCostBasis,
+                          ),
+                        ),
                       )}
                     </td>
                   </tr>
