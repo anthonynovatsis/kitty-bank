@@ -45,6 +45,12 @@ Always pass `--name=<snake_case_description>` to `pnpm db:generate`. Never keep
 drizzle-kit's random names (`0002_melodic_starjammers`) — the migration list
 should read as a history of schema changes.
 
+**Apply it to your own dev database too.** `db:generate` only writes the file.
+Both test suites build their databases from scratch by replaying migrations, so
+a stale `db.sqlite` fails nothing and stays silently behind — which is how a
+converted-to-cents schema ended up reading dollars as cents in dev while every
+test passed.
+
 Check the generated SQL before committing it. For a new non-nullable column,
 drizzle-kit emits `ADD COLUMN ... NOT NULL`, which SQLite only accepts while the
 table is **empty**; add a constant `DEFAULT` plus a backfill `UPDATE` so it also
