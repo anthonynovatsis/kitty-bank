@@ -7,6 +7,7 @@ import { authClient } from "~/server/better-auth/client";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import { ThemeIllustration } from "~/components/ThemeIllustration";
 
 export default function SignUp() {
   const router = useRouter();
@@ -75,10 +76,15 @@ export default function SignUp() {
     }
   };
 
+  /*
+   * A session check before redirecting an already-signed-in user, not content
+   * loading — so a skeleton would be misleading. The mark plus a pulse says
+   * "hold on" without pretending a page is about to fill in here.
+   */
   if (checkingAuth) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="text-lg">Loading...</div>
+      <div className="bg-muted flex min-h-screen items-center justify-center">
+        <ThemeIllustration name="brand" className="size-12 animate-pulse" />
       </div>
     );
   }
@@ -86,7 +92,10 @@ export default function SignUp() {
   return (
     <div className="bg-muted flex min-h-screen flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <h2 className="text-foreground mt-6 text-center text-3xl font-bold tracking-tight">
+        {/* These pages sit outside the app shell, so this is the only place
+            the brand appears before you are signed in. */}
+        <ThemeIllustration name="brand" className="mx-auto size-14" />
+        <h2 className="text-foreground mt-4 text-center text-3xl font-bold tracking-tight">
           Create your Kitty Bank account
         </h2>
         <p className="text-muted-foreground mt-2 text-center text-sm">

@@ -215,7 +215,7 @@ unaffected throughout.
   switcher with one option cannot be tested. T6 is now just the Terminal
   theme and refinement.
 
-### Phase T5: Theme graphics — favicon outstanding
+### Phase T5: Theme graphics ✅
 
 Illustration is what sells the Kitten theme; without it the theme is just pink.
 
@@ -236,15 +236,20 @@ Illustration is what sells the Kitten theme; without it the theme is just pink.
       slot must degrade to nothing cleanly
 - [x] Inline SVG in a `<ThemeIllustration name="…" />` component, not `<img>`,
       so art inherits `currentColor` and tracks the theme's palette
-- [ ] Per-theme favicon + `metadata.icons` (currently one static `favicon.ico`)
+- [x] Per-theme favicon + `metadata.icons`, resolved from the theme cookie in
+      `generateMetadata`. Colours are baked into each SVG: a favicon is fetched
+      outside the page and cannot read CSS variables, so this is the one mark
+      the colour-by-role rule cannot reach
 
 **Delivered:** 8 marks — `brand`, three empty states, `success`, and one per
 account type. Default uses lucide; Kitten uses hand-drawn flat vector redrawn
 from supplied reference art, grouped by `data-role` so a commission drops into
 `ThemeIllustration.tsx` and nothing else.
 
-**Outstanding:** per-theme favicon, and the brand mark on the auth pages (which
-would also clear the last two bare `Loading...` strings).
+**Also delivered:** the brand mark on sign-in and sign-up — the only branding
+before you are signed in, since those pages sit outside the app shell — and
+their session-check gates, which now show the mark rather than the word
+"Loading...". No bare loading string remains in `src/app`.
 
 **Sourcing:** see `plans/illustration_brief.md` — a hand-off document covering
 all 8 marks, the five colour roles, and the SVG requirements that keep the art

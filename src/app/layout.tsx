@@ -9,11 +9,25 @@ import { ThemeProvider } from "~/components/ThemeProvider";
 import { Toaster } from "~/components/ui/sonner";
 import { MODE_COOKIE, THEME_COOKIE, parseMode, parseTheme } from "~/lib/theme";
 
-export const metadata: Metadata = {
-  title: "Kitty Bank",
-  description: "Track your savings and manage your money",
-  icons: [{ rel: "icon", url: "/favicon.ico" }],
-};
+/*
+ * The tab icon follows the theme, resolved from the same cookie as everything
+ * else. A favicon is fetched by the browser outside the page, so it cannot
+ * read CSS variables — each theme ships its own file with colours baked in.
+ *
+ * The .ico stays as a fallback for anything that will not take an SVG icon.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const theme = parseTheme((await cookies()).get(THEME_COOKIE)?.value);
+
+  return {
+    title: "Kitty Bank",
+    description: "Track your savings and manage your money",
+    icons: [
+      { rel: "icon", url: `/favicon-${theme}.svg`, type: "image/svg+xml" },
+      { rel: "alternate icon", url: "/favicon.ico" },
+    ],
+  };
+}
 
 /*
  * Every theme's font is loaded here, because next/font runs at module scope and

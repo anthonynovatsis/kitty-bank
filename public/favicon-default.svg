@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!--
+    Colours are baked in, unlike every other mark in the app: a favicon is
+    fetched by the browser outside the page, so it cannot read the theme's CSS
+    variables. These are the Default theme's --primary and --background at the
+    time of writing. Changing the palette means changing this file too.
+  -->
+  <rect width="64" height="64" rx="12" fill="#18417C"/>
+  <g fill="#FFFFFF">
+    <path d="M32 12 L54 24 L54 28 L10 28 L10 24 Z"/>
+    <rect x="16" y="32" width="6" height="16" rx="1.5"/>
+    <rect x="29" y="32" width="6" height="16" rx="1.5"/>
+    <rect x="42" y="32" width="6" height="16" rx="1.5"/>
+    <rect x="10" y="51" width="44" height="5" rx="2"/>
+  </g>
+</svg>
