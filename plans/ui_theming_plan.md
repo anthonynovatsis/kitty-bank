@@ -215,27 +215,36 @@ unaffected throughout.
   switcher with one option cannot be tested. T6 is now just the Terminal
   theme and refinement.
 
-### Phase T5: Theme graphics
+### Phase T5: Theme graphics — favicon outstanding
 
 Illustration is what sells the Kitten theme; without it the theme is just pink.
 
-- [ ] Add `--illustration-*` slots to the token contract so a theme supplies art
-      the same way it supplies colour
-- [ ] Define the illustration surface list (small, deliberately):
+- [x] ~~`--illustration-*` token slots~~ — art is geometry, not a value, so a
+      CSS variable cannot carry it. Every theme's variant renders and CSS picks
+      one, which keeps the component server-side and free of theme branching
+- [x] Define the illustration surface list (small, deliberately):
       - empty states — "no accounts yet", "no pending transactions"
         (`data-testid="no-pending-transactions"` already marks one),
         "no transfer targets" (`no-transfer-targets`)
       - signin / signup page mark
       - dashboard header mark
       - success confirmation after a transaction settles
-- [ ] Kitten theme: cartoon kitten art — a sleeping kitten for empty states, a
+- [x] Kitten theme: cartoon kitten art — a sleeping kitten for empty states, a
       kitten with a coin for transaction success, a kitten face as the header
       mark
-- [ ] Serious theme: geometric/abstract marks, or no illustration at all — the
+- [x] Serious theme: geometric/abstract marks, or no illustration at all — the
       slot must degrade to nothing cleanly
-- [ ] Inline SVG in a `<ThemeIllustration name="…" />` component, not `<img>`,
+- [x] Inline SVG in a `<ThemeIllustration name="…" />` component, not `<img>`,
       so art inherits `currentColor` and tracks the theme's palette
 - [ ] Per-theme favicon + `metadata.icons` (currently one static `favicon.ico`)
+
+**Delivered:** 8 marks — `brand`, three empty states, `success`, and one per
+account type. Default uses lucide; Kitten uses hand-drawn flat vector redrawn
+from supplied reference art, grouped by `data-role` so a commission drops into
+`ThemeIllustration.tsx` and nothing else.
+
+**Outstanding:** per-theme favicon, and the brand mark on the auth pages (which
+would also clear the last two bare `Loading...` strings).
 
 **Sourcing:** see `plans/illustration_brief.md` — a hand-off document covering
 all 8 marks, the five colour roles, and the SVG requirements that keep the art
