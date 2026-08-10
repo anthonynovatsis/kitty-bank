@@ -449,6 +449,16 @@ Phase 3's investment service should follow the same shape.
 - [ ] Investment transaction approval endpoints
 - [ ] Holdings management operations
 
+**One approval queue, not two.** `admin.transactions.pending` returns cash and
+investment rows in a single list ordered by date, each carrying a discriminant
+for which kind it is; `admin.transactions.approve` takes the same discriminant
+and routes to the right service. An admin triages by what arrived first, not by
+what kind of thing it is, and two queues means two places to forget to look.
+
+Filtering by kind can come later — it is a predicate over one list, so nothing
+here forecloses it. Splitting a merged queue later would instead be a rewrite of
+the component, which is why this is the direction chosen now.
+
 **User Interface:**
 - [ ] Investment account detail pages with holdings
 - [ ] Buy/sell order forms  
