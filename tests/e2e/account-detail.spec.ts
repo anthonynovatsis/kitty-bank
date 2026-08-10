@@ -123,8 +123,9 @@ test.describe("account detail — investment account", () => {
     await expect(
       page.locator("h1", { hasText: "E2E Portfolio Detail" }),
     ).toBeVisible();
-    await expect(page.locator("text=Portfolio Value")).toBeVisible();
-    await expect(page.locator("text=$0.00")).toBeVisible();
+    const summary = page.locator("[data-testid='portfolio-summary']");
+    await expect(summary).toContainText("Cost Basis");
+    await expect(summary).toContainText("$0.00");
     await expect(
       page.locator("[data-testid='holdings-section']"),
     ).toBeVisible();

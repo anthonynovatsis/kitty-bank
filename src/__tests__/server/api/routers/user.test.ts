@@ -128,7 +128,7 @@ describe("user.accounts.list", () => {
         investmentAccountId: portfolio.id,
         symbol: "FRAC",
         quantity: 7.5,
-        averageCostBasis: cents(100_00),
+        totalCostBasis: cents(750_00),
       }),
     ).rejects.toThrow(/CHECK constraint failed/i);
 
@@ -138,7 +138,7 @@ describe("user.accounts.list", () => {
       investmentAccountId: portfolio.id,
       symbol: "WHOLE",
       quantity: 7.0,
-      averageCostBasis: cents(100_00),
+      totalCostBasis: cents(700_00),
     });
 
     const stored = await db.query.holdings.findFirst({
@@ -149,14 +149,14 @@ describe("user.accounts.list", () => {
     await db.delete(holdings).where(eq(holdings.symbol, "WHOLE"));
   });
 
-  it("calculates investment account totalValue from holdings", async () => {
+  it("calculates investment account totalCost from holdings", async () => {
     // Grab the investment account id created for user1
     const caller = createTestCaller(db, makeSession(user1));
     const result = await caller.user.accounts.list();
     const portfolio = result.investmentAccounts[0]!;
 
-    // No holdings yet → totalValue should be 0
-    expect(portfolio.totalValue).toBe(0);
+    // No holdings yet → totalCost should be 0
+    expect(portfolio.totalCost).toBe(0);
     expect(portfolio.holdingsCount).toBe(0);
 
     // Seed two holdings directly and re-fetch
@@ -165,13 +165,13 @@ describe("user.accounts.list", () => {
         investmentAccountId: portfolio.id,
         symbol: "AAPL",
         quantity: 10,
-        averageCostBasis: cents(150_00),
+        totalCostBasis: cents(1500_00),
       },
       {
         investmentAccountId: portfolio.id,
         symbol: "MSFT",
         quantity: 5,
-        averageCostBasis: cents(300_00),
+        totalCostBasis: cents(1500_00),
       },
     ]);
 
@@ -179,7 +179,7 @@ describe("user.accounts.list", () => {
     const updatedPortfolio = updated.investmentAccounts[0]!;
 
     // 10 * $150 + 5 * $300 = $1500 + $1500 = $3000
-    expect(updatedPortfolio.totalValue).toBe(3000_00);
+    expect(updatedPortfolio.totalCost).toBe(3000_00);
     expect(updatedPortfolio.holdingsCount).toBe(2);
   });
 });
@@ -240,7 +240,7 @@ describe("user.accounts.getDetails", () => {
     expect(result.account.balance).toBe(0);
   });
 
-  it("returns an investment account with holdings and totalValue", async () => {
+  it("returns an investment account with holdings and totalCost", async () => {
     const caller = createTestCaller(db, makeSession(user1));
 
     // Seed a holding
@@ -248,7 +248,7 @@ describe("user.accounts.getDetails", () => {
       investmentAccountId,
       symbol: "AAPL",
       quantity: 10,
-      averageCostBasis: cents(200_00),
+      totalCostBasis: cents(2000_00),
     });
 
     const result = await caller.user.accounts.getDetails({
@@ -258,7 +258,7 @@ describe("user.accounts.getDetails", () => {
     assert(result.type === "investment");
     expect(result.account.id).toBe(investmentAccountId);
     // 10 * $200 = $2000
-    expect(result.account.totalValue).toBe(2000_00);
+    expect(result.account.totalCost).toBe(2000_00);
     expect(result.account.holdings).toHaveLength(1);
     expect(result.account.holdings[0]!.symbol).toBe("AAPL");
   });
@@ -287,7 +287,7 @@ describe("user.accounts.getDetails", () => {
     );
   });
 
-  it("totalValue is 0 when investment account has no holdings", async () => {
+  it("totalCost is 0 when investment account has no holdings", async () => {
     const adminCaller = createTestCaller(db, makeSession(admin));
     const { account } = await adminCaller.admin.accounts.create({
       userId: user1.id,
@@ -300,7 +300,7 @@ describe("user.accounts.getDetails", () => {
     });
     expect(result.type).toBe("investment");
     assert(result.type === "investment");
-    expect(result.account.totalValue).toBe(0);
+    expect(result.account.totalCost).toBe(0);
     expect(result.account.holdings).toHaveLength(0);
   });
 });

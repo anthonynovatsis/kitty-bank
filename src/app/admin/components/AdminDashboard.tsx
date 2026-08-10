@@ -102,9 +102,9 @@ export function AdminDashboard() {
                 {investmentAccounts.length}
               </div>
               <p className="text-muted-foreground mt-1 text-sm">
-                Total Value:{" "}
+                Total Cost Basis:{" "}
                 {formatCents(
-                  sumCents(investmentAccounts, (acc) => acc.totalValue),
+                  sumCents(investmentAccounts, (acc) => acc.totalCost),
                 )}
               </p>
             </div>
@@ -116,7 +116,7 @@ export function AdminDashboard() {
                 {formatCents(
                   cents(
                     sumCents(cashAccounts, (acc) => acc.balance) +
-                      sumCents(investmentAccounts, (acc) => acc.totalValue),
+                      sumCents(investmentAccounts, (acc) => acc.totalCost),
                   ),
                 )}
               </div>
@@ -169,7 +169,7 @@ export function AdminDashboard() {
                     </div>
                     <div className="text-right">
                       <p className="font-medium">
-                        {formatCents(account.totalValue)}
+                        {formatCents(account.totalCost)}
                       </p>
                       <StatusBadge tone={statusTone(account.status)}>
                         {account.status}
@@ -250,7 +250,7 @@ export function AdminDashboard() {
                   </div>
                   <div className="text-right">
                     <p className="text-lg font-medium">
-                      {formatCents(account.totalValue)}
+                      {formatCents(account.totalCost)}
                     </p>
                     <StatusBadge tone={statusTone(account.status)}>
                       {account.status}

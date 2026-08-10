@@ -7,7 +7,7 @@ import { CashTransactionForms } from "./CashTransactionForms";
 import { CashTransactionHistory } from "./CashTransactionHistory";
 import { EmptyState } from "~/components/ThemeIllustration";
 import { SummarySkeleton } from "~/components/Skeletons";
-import { cents, formatCents, type Cents } from "~/lib/money";
+import { averageCents, formatCents, type Cents } from "~/lib/money";
 
 /** Binds the account-status testid, so both render sites stay selectable alike. */
 function AccountStatusBadge({ status }: { status: "active" | "closed" }) {
@@ -130,7 +130,7 @@ type Holding = {
   symbol: string;
   companyName: string | null;
   quantity: number;
-  averageCostBasis: Cents;
+  totalCostBasis: Cents;
   dividendReinvestment: boolean;
 };
 
@@ -140,7 +140,7 @@ type InvestmentAccount = {
   accountNumber: string;
   status: "active" | "closed";
   createdAt: Date;
-  totalValue: Cents;
+  totalCost: Cents;
   holdings: Holding[];
 };
 
@@ -160,13 +160,15 @@ function InvestmentAccountDetail({ account }: { account: InvestmentAccount }) {
         <AccountStatusBadge status={account.status} />
       </div>
 
-      {/* Portfolio value card */}
-      <div className="bg-card rounded-lg p-6 shadow">
-        <p className="text-muted-foreground text-sm font-medium">
-          Portfolio Value
-        </p>
+      {/* Cost basis card. Not "portfolio value" — there is no market data yet,
+          so this is what the positions cost, not what they are worth. */}
+      <div
+        data-testid="portfolio-summary"
+        className="bg-card rounded-lg p-6 shadow"
+      >
+        <p className="text-muted-foreground text-sm font-medium">Cost Basis</p>
         <p className="text-foreground mt-1 text-4xl font-bold">
-          {formatCents(account.totalValue)}
+          {formatCents(account.totalCost)}
         </p>
         <p className="text-muted-foreground mt-1 text-sm">
           {account.holdings.length} holding
@@ -193,7 +195,7 @@ function InvestmentAccountDetail({ account }: { account: InvestmentAccount }) {
                   <th className="pr-4 pb-3 font-medium">Company</th>
                   <th className="pr-4 pb-3 text-right font-medium">Quantity</th>
                   <th className="pr-4 pb-3 text-right font-medium">Avg Cost</th>
-                  <th className="pb-3 text-right font-medium">Total Value</th>
+                  <th className="pb-3 text-right font-medium">Total Cost</th>
                 </tr>
               </thead>
               <tbody className="divide-border divide-y">
@@ -207,16 +209,12 @@ function InvestmentAccountDetail({ account }: { account: InvestmentAccount }) {
                       {holding.quantity.toLocaleString()}
                     </td>
                     <td className="py-3 pr-4 text-right">
-                      {formatCents(holding.averageCostBasis)}
+                      {formatCents(
+                        averageCents(holding.totalCostBasis, holding.quantity),
+                      )}
                     </td>
                     <td className="py-3 text-right font-medium">
-                      {formatCents(
-                        cents(
-                          Math.round(
-                            holding.quantity * holding.averageCostBasis,
-                          ),
-                        ),
-                      )}
+                      {formatCents(holding.totalCostBasis)}
                     </td>
                   </tr>
                 ))}

@@ -103,7 +103,7 @@ export const userRouter = createTRPCRouter({
                 symbol: true,
                 companyName: true,
                 quantity: true,
-                averageCostBasis: true,
+                totalCostBasis: true,
               },
             },
           },
@@ -119,10 +119,9 @@ export const userRouter = createTRPCRouter({
         investmentAccounts: investmentAccs.map((acc) => ({
           ...acc,
           type: "investment" as const,
-          // quantity is a share count, not money, so each product is rounded
-          // back to whole cents rather than left fractional.
-          totalValue: sumCents(acc.holdings, (holding) =>
-            Math.round(holding.quantity * holding.averageCostBasis),
+          totalCost: sumCents(
+            acc.holdings,
+            (holding) => holding.totalCostBasis,
           ),
           holdingsCount: acc.holdings.length,
         })),
@@ -164,8 +163,9 @@ export const userRouter = createTRPCRouter({
             type: "investment" as const,
             account: {
               ...investmentAccount,
-              totalValue: sumCents(investmentAccount.holdings, (h) =>
-                Math.round(h.quantity * h.averageCostBasis),
+              totalCost: sumCents(
+                investmentAccount.holdings,
+                (h) => h.totalCostBasis,
               ),
             },
           };

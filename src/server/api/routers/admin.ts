@@ -243,7 +243,7 @@ export const adminRouter = createTRPCRouter({
                 columns: {
                   symbol: true,
                   quantity: true,
-                  averageCostBasis: true,
+                  totalCostBasis: true,
                 },
               },
             },
@@ -263,8 +263,9 @@ export const adminRouter = createTRPCRouter({
           investmentAccounts: investmentAccs.map((acc) => ({
             ...acc,
             type: "investment" as const,
-            totalValue: sumCents(acc.holdings, (holding) =>
-              Math.round(holding.quantity * holding.averageCostBasis),
+            totalCost: sumCents(
+              acc.holdings,
+              (holding) => holding.totalCostBasis,
             ),
           })),
         };

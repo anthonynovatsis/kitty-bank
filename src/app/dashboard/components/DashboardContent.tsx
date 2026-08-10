@@ -33,12 +33,12 @@ export function DashboardContent() {
     (acc) => acc.balance,
   );
 
-  const totalInvestmentValue = sumCents(
+  const totalInvestmentCost = sumCents(
     accounts?.investmentAccounts ?? [],
-    (acc) => acc.totalValue,
+    (acc) => acc.totalCost,
   );
 
-  const totalNetWorth = cents(totalCashBalance + totalInvestmentValue);
+  const totalNetWorth = cents(totalCashBalance + totalInvestmentCost);
 
   return (
     <>
@@ -52,7 +52,7 @@ export function DashboardContent() {
         </p>
         <div className="text-muted-foreground mt-2 text-sm">
           <p>Cash: {formatCents(totalCashBalance)}</p>
-          <p>Investments: {formatCents(totalInvestmentValue)}</p>
+          <p>Investments: {formatCents(totalInvestmentCost)}</p>
         </div>
       </div>
 
@@ -110,7 +110,7 @@ export function DashboardContent() {
               <StatusBadge tone="accent">investment</StatusBadge>
             </div>
             <p className="text-foreground mt-2 text-2xl font-bold">
-              {formatCents(account.totalValue)}
+              {formatCents(account.totalCost)}
             </p>
             <p className="text-muted-foreground text-sm">
               {account.holdingsCount} holdings • {account.accountNumber}

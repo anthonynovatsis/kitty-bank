@@ -59,8 +59,8 @@ This document outlines the plan to add bank account management functionality to 
 - investment_account_id: text (FK to investment_accounts.id)
 - symbol: text
 - company_name: text
-- quantity: decimal (current total shares/units)
-- average_cost_basis: decimal (weighted average)
+- quantity: integer (current total whole shares/units)
+- total_cost_basis: integer cents (cost of the whole position; average derived)
 - dividend_reinvestment: boolean
 - dividend_cash_balance: decimal (fractional cash carried forward for DRIP)
 - last_transaction_date: timestamp
@@ -363,6 +363,22 @@ and realised gain subtracts near-equal numbers — all of which compound float
 error in a way that deposits and withdrawals do not. Storing total cost and
 total quantity, and deriving the average only for display, avoids accumulating
 any error at all.
+
+That is now what `holdings` does: `total_cost_basis` is a pool, in the sense UK
+Section 104 and Canadian ACB use the word. A buy adds `quantity * price +
+brokerage` to it; a sell removes a *proportion* of it —
+`round(total * sold / held)` — and subtracts that from the stored total rather
+than recomputing from a fresh average, so the rounding remainder stays in the
+pool instead of leaking. A full exit takes the remaining cost exactly, by
+construction. `averageCents` in `src/lib/money.ts` is the only division, and it
+runs on the way to a screen.
+
+It keeps the cache honest, too. Holdings are meant to be rebuildable from
+`investment_transactions`; with a stored average the incremental and replayed
+values round differently, so a reconciliation would report drift that isn't
+there. And because the journal keeps every buy, adopting FIFO or specific-ID
+lots in Phase 4 is a re-derivation rather than a data migration — the same
+reversibility argument as whole shares.
 
 `holdings.quantity` is a share count rather than money, so it is a plain
 integer rather than scaled minor units. **Whole shares only:** a corporate

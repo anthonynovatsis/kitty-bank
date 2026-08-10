@@ -52,6 +52,18 @@ export function sumCents<T>(
   return cents(items.reduce((total, item) => total + of(item), 0));
 }
 
+/**
+ * A per-unit average, for display.
+ *
+ * The one division in the money layer, and it is deliberately not a stored
+ * value: totals stay exact and the average is derived each time it is shown, so
+ * the rounding here never feeds back into the next calculation. A zero count
+ * gives zero rather than NaN — an emptied holding has no meaningful average.
+ */
+export function averageCents(total: Cents, count: number): Cents {
+  return count === 0 ? cents(0) : cents(Math.round(total / count));
+}
+
 /** Cents back to a decimal. Display only — never feed this into arithmetic. */
 function toAmount(value: Cents): number {
   return value / 100;

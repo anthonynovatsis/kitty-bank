@@ -35,6 +35,20 @@
       "when": 1786261069438,
       "tag": "0004_whole_share_quantities",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1786363182347,
+      "tag": "0005_add_holdings_total_cost_basis",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1786363191493,
+      "tag": "0006_drop_holdings_average_cost_basis",
+      "breakpoints": true
     }
   ]
 }

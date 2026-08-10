@@ -218,7 +218,23 @@ export const holdings = sqliteTable(
      * so only genuine fractions are rejected.
      */
     quantity: d.integer().notNull(),
-    averageCostBasis: d.integer().$type<Cents>().notNull(),
+    /*
+     * The *total* cost of the position, not the per-share average — a pool, in
+     * the sense UK Section 104 and Canadian ACB use the word. A buy adds
+     * `quantity * price + brokerage` to it; a sell removes a proportion of it.
+     *
+     * Storing the average instead would round on every buy and compound from
+     * the rounded base: 3 shares at $100 plus 1 at $101 plus $9.99 brokerage is
+     * 10,274.75c per share, and a Cents column can only keep 10,275. Held as a
+     * total, 41,099 stays 41,099 however many buys follow, and the division
+     * happens once — in `averageCents`, on the way to a screen.
+     *
+     * It also keeps this cache honest. Holdings are meant to be rebuildable
+     * from `investment_transactions`; with a stored average the incremental and
+     * replayed values round differently and a reconciliation would report drift
+     * that isn't there.
+     */
+    totalCostBasis: d.integer().$type<Cents>().notNull(),
     dividendReinvestment: d
       .integer({ mode: "boolean" })
       .notNull()
