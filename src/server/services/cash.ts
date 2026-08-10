@@ -1,9 +1,10 @@
-import { TRPCError } from "@trpc/server";
+import type { TRPCError } from "@trpc/server";
 import { and, eq, gte, sql, type SQL } from "drizzle-orm";
 
 import { formatCents, type Cents } from "~/lib/money";
 import type { Transaction } from "~/server/db";
-import { cashAccounts, userSettings } from "~/server/db/schema";
+import { cashAccounts } from "~/server/db/schema";
+import { defineRuleErrors } from "./errors";
 
 /**
  * Cash movement rules shared by both halves of the approval workflow:
@@ -31,54 +32,29 @@ export type CashErrorKind =
   | "already_decided";
 
 /** tRPC code per kind. Malformed input is 400; state that forbids the operation is 409. */
-const CODE_FOR_KIND = {
+const CODE_FOR_KIND: Record<CashErrorKind, TRPCError["code"]> = {
   account_not_found: "NOT_FOUND",
   account_closed: "CONFLICT",
   insufficient_funds: "CONFLICT",
   invalid_transfer: "BAD_REQUEST",
   unsettleable_type: "CONFLICT",
   already_decided: "CONFLICT",
-} as const;
+};
 
-/**
- * A refusal from the cash rules.
- *
- * This is a plain Error, deliberately: it carries no transport concepts, so the
- * day something outside tRPC calls these helpers it is already the right shape.
- * For now `cashError()` wraps it in a TRPCError for the routers.
- */
-export class CashRuleViolation extends Error {
-  constructor(
-    readonly kind: CashErrorKind,
-    message: string,
-  ) {
-    super(message);
-    this.name = "CashRuleViolation";
-  }
-}
+const errors = defineRuleErrors("cash", CODE_FOR_KIND);
 
 /** Build the TRPCError the routers throw, with the domain error as its cause. */
 export function cashError(kind: CashErrorKind, message: string) {
-  return new TRPCError({
-    code: CODE_FOR_KIND[kind],
-    message,
-    cause: new CashRuleViolation(kind, message),
-  });
+  return errors.error(kind, message);
 }
 
 /**
  * Narrow an unknown error to a cash refusal, optionally of one specific kind.
- * Reads through the TRPCError wrapper, so it works on either form.
+ * Reads through the TRPCError wrapper, so it works on either form — and does
+ * not match another service's refusal that happens to share a kind name.
  */
-export function isCashError(error: unknown, kind?: CashErrorKind): boolean {
-  const violation =
-    error instanceof CashRuleViolation
-      ? error
-      : error instanceof TRPCError && error.cause instanceof CashRuleViolation
-        ? error.cause
-        : null;
-
-  return violation !== null && (kind === undefined || violation.kind === kind);
+export function isCashError(error: unknown, kind?: CashErrorKind) {
+  return errors.is(error, kind);
 }
 
 export type SettleableType = "deposit" | "withdrawal" | "transfer";
@@ -91,15 +67,6 @@ export type CashMovement = {
   toAccountId: string | null;
   amount: Cents;
 };
-
-/** True when this user's transactions have to be approved by an admin. */
-export async function requiresApproval(tx: Transaction, userId: string) {
-  const settings = await tx.query.userSettings.findFirst({
-    where: eq(userSettings.userId, userId),
-  });
-  // A user with no settings row is untrusted by default.
-  return settings?.requiresTransactionApproval ?? true;
-}
 
 /** Load a cash account, or fail with NOT_FOUND. */
 export async function loadCashAccount(tx: Transaction, accountId: string) {

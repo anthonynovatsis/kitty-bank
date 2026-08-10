@@ -407,9 +407,25 @@ would reveal the difference.
 
 A single procedure can refuse for several different reasons that share one tRPC
 code — `user.cash.transfer` has four. So services throw via `cashError(kind,
-message)`, which attaches a `CashRuleViolation` (a plain `Error` carrying a
-`kind`) as the cause. Callers branch with `isCashError(err, kind)` instead of
-matching on message text.
+message)`, which attaches a `RuleViolation` (a plain `Error` carrying a `kind`)
+as the cause. Callers branch with `isCashError(err, kind)` instead of matching
+on message text.
+
+**The machinery lives in `src/server/services/errors.ts`, and a new service
+uses it rather than copying it.** Declare the kind→code table, pass it to
+`defineRuleErrors(domain, codes)`, and export the `error`/`is` pair it returns —
+which is all `cash.ts` now does. Two hand-written copies of this would be two
+implementations free to drift, and the `is` half is subtle enough to drift
+badly.
+
+The domain string is part of the match, not a label. Kind names are unique only
+within a service: investments will refuse with `account_not_found` too, and
+without the domain `isCashError(someInvestmentFailure, "account_not_found")`
+answers true — the exact confusion `kind` exists to prevent. Covered by a test.
+
+`requiresApproval` moved to `src/server/services/approval.ts` for the same
+reason. The rule is about the user rather than about what they are attempting,
+so cash and investments must both consult it and both get the same answer.
 
 Codes follow the split: malformed input is `BAD_REQUEST`, state that forbids the
 operation is `CONFLICT`, missing rows are `NOT_FOUND`.

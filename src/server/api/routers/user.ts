@@ -9,9 +9,9 @@ import {
   assertSufficientFunds,
   cashError,
   loadCashAccount,
-  requiresApproval,
   settleCashMovement,
 } from "~/server/services/cash";
+import { requiresApproval } from "~/server/services/approval";
 import type { Transaction } from "~/server/db";
 import {
   cashAccounts,

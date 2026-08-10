@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { eq } from "drizzle-orm";
 import { cashAccounts, cashTransactions } from "~/server/db/schema";
 import { isCashError, type CashErrorKind } from "~/server/services/cash";
+import { defineRuleErrors } from "~/server/services/errors";
 import { createTestDb, type TestDb } from "../../../helpers/db";
 import { cents, type Cents } from "~/lib/money";
 import {
@@ -200,6 +201,24 @@ describe("cash rule errors", () => {
     expect(isCashError(notFound, "insufficient_funds")).toBe(false);
     expect(isCashError(new Error("something else"))).toBe(false);
     expect(isCashError(undefined)).toBe(false);
+  });
+
+  /*
+   * Kind names are only unique within a service — investments will refuse with
+   * `account_not_found` too. Without the domain in the match, `isCashError`
+   * would answer true for another service's refusal, which is precisely the
+   * confusion `kind` exists to prevent.
+   */
+  it("does not match another service's refusal of the same kind", () => {
+    const other = defineRuleErrors("investments", {
+      account_not_found: "NOT_FOUND",
+    } as const);
+
+    const theirs = other.error("account_not_found", "Investment account gone");
+
+    expect(isCashError(theirs)).toBe(false);
+    expect(isCashError(theirs, "account_not_found")).toBe(false);
+    expect(other.is(theirs, "account_not_found")).toBe(true);
   });
 });
 
