@@ -15,7 +15,7 @@ This document outlines the plan to add bank account management functionality to 
 
 2. **Investment Account** - Securities trading accounts
    - Holds equity positions (stocks, shares)
-   - Has a linked cash settlement account
+   - Standalone: no linked cash settlement account (see Phase 3)
    - Supports buy/sell transactions with cost basis tracking
 
 ### Account Relationships
@@ -443,6 +443,30 @@ Phase 3's investment service should follow the same shape.
 - [ ] Holdings adjustments for corporate actions
 
 **Result:** Working investment transaction system
+
+**Trades do not move cash.** `investment_accounts` has no settlement account, so
+a buy debits nothing and a sell credits nothing — the account is a position
+tracker, which is what Sharesight and most portfolio trackers are. Realised gain
+on a sell is therefore a *reported* figure on the transaction, not a balance
+change anywhere; "where did my profit go" is the first question this will
+prompt, so say it in the UI.
+
+The consequence to watch is that a buy raises the portfolio against nothing, and
+both dashboards fold investments into a net-worth total. Recording a $5,000 buy
+raises that total by $5,000. That is a labelling decision, not a modelling bug —
+but it is the part most likely to mislead a supervised user.
+
+Deferred rather than dropped, and the retrofit is additive: a nullable
+settlement FK on `investment_accounts`, plus one `moveBalance` call inside the
+settle path (issued as SQL, per the concurrency rule above). No holdings maths
+changes. Adding the column before anything writes it would only create an
+untestable branch, which is why it waits.
+
+**Cost, not value.** Until Phase 4 brings in market prices there is no such
+thing as portfolio value here — `totalCost` on an investment account is the sum
+of `total_cost_basis`, and the UI says "Cost Basis". Keeping the word "value"
+free means it will mean something when prices arrive, rather than quietly
+changing definition under an unchanged label.
 
 ### Phase 4: Advanced Investment Features
 - [ ] Dividend processing and DRIP functionality
