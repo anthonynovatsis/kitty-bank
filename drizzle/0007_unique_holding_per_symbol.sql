@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `holdings_account_symbol_unique` ON `holdings` (`investment_account_id`,`symbol`);

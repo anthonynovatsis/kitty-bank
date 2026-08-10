@@ -1,5 +1,10 @@
 import { relations, sql } from "drizzle-orm";
-import { check, index, sqliteTable } from "drizzle-orm/sqlite-core";
+import {
+  check,
+  index,
+  sqliteTable,
+  uniqueIndex,
+} from "drizzle-orm/sqlite-core";
 import { cents, type Cents } from "~/lib/money";
 
 // Better Auth core tables
@@ -250,6 +255,19 @@ export const holdings = sqliteTable(
   (t) => [
     index("holdings_investment_account_id_idx").on(t.investmentAccountId),
     index("holdings_symbol_idx").on(t.symbol),
+    /*
+     * One row per symbol per account — a position is identified by the pair,
+     * and a second row for the same symbol would split the pool in two so that
+     * neither reads as the real holding.
+     *
+     * It also makes a buy a single atomic upsert rather than a read followed by
+     * an insert-or-update, which two concurrent buys of the same symbol could
+     * otherwise interleave into two rows.
+     */
+    uniqueIndex("holdings_account_symbol_unique").on(
+      t.investmentAccountId,
+      t.symbol,
+    ),
     check("holdings_quantity_whole", sql`typeof(${t.quantity}) = 'integer'`),
   ],
 );
