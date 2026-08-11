@@ -577,13 +577,35 @@ would only cover things pending simultaneously: a buy back-dated to before an
 already-approved split still lands on top of it. Only recomputing from the
 journal puts that right.
 
-Note this only becomes automatic if **settlement itself** goes through the
-rebuild rather than staying incremental. That is a live decision: incremental
-settlement keeps the atomic `quantity = quantity ± ?` the concurrency rule asks
-for, while rebuilding on settle makes the position always equal the journal at
-the cost of reading history and writing an absolute value. The failure modes
-differ — a lost increment is corrupt permanently, a lost rebuild is repaired by
-running it again.
+**Settlement stays incremental. Decided — do not relitigate.** The ordering
+above only becomes automatic if settlement itself goes through the rebuild, and
+it will not.
+
+The pattern here is the event-sourced one: an incrementally updated projection
+(`holdings`) plus a replay available on demand (`rebuildHolding`) for repair,
+reconciliation and delete. Personal trackers like Sharesight, and plain-text
+accounting tools, derive everything instead and store no position at all —
+correct when editing history is a *primary* workflow. Brokerages go the other
+way: an incrementally maintained position of record, an append-only journal,
+corrections booked as reversing entries, and replay used only to reconcile.
+
+Here, editing history is for fixing mistakes rather than routine bookkeeping,
+which puts us in the middle where the hybrid belongs.
+
+What that costs, accepted knowingly: the same arithmetic exists twice — once in
+`removeShares`/`settleSplit` for the write path, once in `foldHistory` for the
+replay. They must agree, which is why the test asserting a replay lands exactly
+where incremental settlement did is load-bearing rather than decorative. Keep
+them in step; do not merge them.
+
+What it buys: settlement stays an atomic `quantity = quantity ± ?` with its
+check in the same statement, refusals at submission carry messages about the
+position in front of the user rather than about a date in a replay, and figures
+already reported to someone do not silently move under them.
+
+So the ordering sensitivity is documented behaviour, not a defect to engineer
+away. When something lands out of date order, the answer is to rebuild that one
+position.
 
 **Later sales are recomputed, not preserved.** If a buy did not happen, the
 shares a later sale disposed of came from somewhere else, so its cost and
