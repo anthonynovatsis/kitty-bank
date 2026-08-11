@@ -219,6 +219,18 @@ export function assertSettleableTrade(
   }
 }
 
+/**
+ * `last_transaction_date`, moved forward only.
+ *
+ * It answers "how recent is this position", so a back-dated entry must not drag
+ * it backwards — and the out-of-order test reads it, which would invert if it
+ * did. Timestamps are stored as unix seconds, hence the conversion.
+ */
+function advancedTransactionDate(date: Date) {
+  const seconds = Math.floor(date.getTime() / 1000);
+  return sql`max(coalesce(${holdings.lastTransactionDate}, 0), ${seconds})`;
+}
+
 /** A position as the journal describes it, before it is written anywhere. */
 export type FoldedPosition = {
   quantity: number;
@@ -432,7 +444,7 @@ async function addShares(tx: Transaction, trade: Trade) {
       set: {
         quantity: sql`${holdings.quantity} + ${trade.quantity}`,
         totalCostBasis: sql`${holdings.totalCostBasis} + ${trade.amount}`,
-        lastTransactionDate: trade.transactionDate,
+        lastTransactionDate: advancedTransactionDate(trade.transactionDate),
         // A later buy may name the company where the first left it null.
         companyName: sql`COALESCE(${holdings.companyName}, ${trade.companyName})`,
       },
@@ -468,7 +480,7 @@ async function removeShares(
     .set({
       quantity: sql`${holdings.quantity} - ${trade.quantity}`,
       totalCostBasis: sql`${holdings.totalCostBasis} - ${costRemoved}`,
-      lastTransactionDate: trade.transactionDate,
+      lastTransactionDate: advancedTransactionDate(trade.transactionDate),
     })
     .where(
       and(
@@ -596,7 +608,7 @@ export async function settleSplit(
     .update(holdings)
     .set({
       quantity: resulting,
-      lastTransactionDate: input.transactionDate,
+      lastTransactionDate: advancedTransactionDate(input.transactionDate),
     })
     .where(
       and(eq(holdings.id, holding.id), eq(holdings.quantity, holding.quantity)),

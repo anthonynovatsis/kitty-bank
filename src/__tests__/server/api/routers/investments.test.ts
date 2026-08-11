@@ -153,6 +153,33 @@ describe("user.investments — trusted user", () => {
     expect(result.transaction.brokerage).toBe(150);
   });
 
+  /*
+   * `last_transaction_date` answers how recent a position is, so a back-dated
+   * entry must not drag it backwards — and the out-of-order test reads it,
+   * which would invert if it did.
+   */
+  it("advances the position's last transaction date, never rewinds it", async () => {
+    const caller = createTestCaller(db, makeSession(trusted));
+
+    await caller.user.investments.buy({
+      accountId,
+      symbol: "DATED",
+      quantity: 1,
+      price: 10,
+      transactionDate: new Date("2026-06-01"),
+    });
+    await caller.user.investments.buy({
+      accountId,
+      symbol: "DATED",
+      quantity: 1,
+      price: 10,
+      transactionDate: new Date("2026-03-01"),
+    });
+
+    const holding = await holdingIn(db, accountId, "DATED");
+    expect(holding?.lastTransactionDate).toEqual(new Date("2026-06-01"));
+  });
+
   it("refuses to sell shares that are not held", async () => {
     const caller = createTestCaller(db, makeSession(trusted));
 
