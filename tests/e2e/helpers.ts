@@ -136,6 +136,19 @@ export async function ensureAccount(
   try {
     const page = await ownerContext.newPage();
     await page.goto("/dashboard");
+
+    /*
+     * Wait for the list before counting. `count()` does not auto-wait, and the
+     * accounts are fetched client-side — reading it on a page still showing the
+     * skeleton returns zero, and this helper then creates a duplicate account.
+     * A second account with the same name is worse than it sounds: `openAccount`
+     * clicks the first card matching the name, so every later test drives a
+     * different, empty account.
+     */
+    await expect(
+      page.locator('[data-testid="dashboard-accounts"]'),
+    ).toBeVisible();
+
     const existing = page.locator('a[href*="/dashboard/accounts/"]', {
       hasText: opts.accountName,
     });
@@ -233,6 +246,55 @@ export async function readBalance(page: Page): Promise<number> {
   await expect(locator).toBeVisible();
   const text = (await locator.textContent()) ?? "";
   return Number(text.replace(/[^0-9.-]/g, ""));
+}
+
+/** Fill in and submit the trade form on an investment account detail page. */
+export async function submitTrade(
+  page: Page,
+  opts: {
+    mode: "buy" | "sell";
+    symbol: string;
+    quantity: number;
+    price: number;
+    companyName?: string;
+    brokerage?: number;
+    description?: string;
+    /** `YYYY-MM-DD`. Omitted leaves the field on its default of today. */
+    date?: string;
+  },
+) {
+  await page.click(`[data-testid="trade-mode-${opts.mode}"]`);
+  await page.fill('[data-testid="symbol-input"]', opts.symbol);
+  await page.fill('[data-testid="quantity-input"]', String(opts.quantity));
+  await page.fill('[data-testid="price-input"]', String(opts.price));
+
+  if (opts.companyName && opts.mode === "buy") {
+    await page.fill('[data-testid="company-name-input"]', opts.companyName);
+  }
+  if (opts.brokerage !== undefined) {
+    await page.fill('[data-testid="brokerage-input"]', String(opts.brokerage));
+  }
+  if (opts.date) {
+    await page.fill('[data-testid="trade-date-input"]', opts.date);
+  }
+  if (opts.description) {
+    await page.fill(
+      '[data-testid="trade-description-input"]',
+      opts.description,
+    );
+  }
+
+  await page.click('[data-testid="submit-trade"]');
+}
+
+/** Read the numeric value out of the cost-basis card on an investment account. */
+export async function readCostBasis(page: Page): Promise<number> {
+  const locator = page.locator('[data-testid="portfolio-summary"]');
+  await expect(locator).toBeVisible();
+  const text = (await locator.textContent()) ?? "";
+  // The card also carries the holdings count, so match the currency figure.
+  const match = /\$([0-9,]+\.[0-9]{2})/.exec(text);
+  return Number((match?.[1] ?? "0").replace(/,/g, ""));
 }
 
 /** Fill in and submit the cash transaction form on an account detail page. */

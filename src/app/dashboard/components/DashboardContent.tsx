@@ -56,8 +56,13 @@ export function DashboardContent() {
         </div>
       </div>
 
-      {/* Accounts Grid */}
-      <div className="mt-8 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      {/* Accounts Grid. The testid marks "the list has loaded" as well as
+          "here is the list" — it renders only past the skeleton, so a test can
+          wait for it before concluding that an account is absent. */}
+      <div
+        data-testid="dashboard-accounts"
+        className="mt-8 grid gap-6 md:grid-cols-2 lg:grid-cols-3"
+      >
         {/* Cash Accounts */}
         {accounts?.cashAccounts.map((account) => (
           <Link

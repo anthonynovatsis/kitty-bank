@@ -5,6 +5,8 @@ import { api } from "~/trpc/react";
 import { StatusBadge, statusTone } from "~/components/StatusBadge";
 import { CashTransactionForms } from "./CashTransactionForms";
 import { CashTransactionHistory } from "./CashTransactionHistory";
+import { TradeForms } from "./TradeForms";
+import { TradeHistory } from "./TradeHistory";
 import { EmptyState } from "~/components/ThemeIllustration";
 import { SummarySkeleton } from "~/components/Skeletons";
 import { averageCents, formatCents, type Cents } from "~/lib/money";
@@ -224,13 +226,11 @@ function InvestmentAccountDetail({ account }: { account: InvestmentAccount }) {
         )}
       </div>
 
-      {/* Buy/sell placeholder */}
-      <div className="bg-card rounded-lg p-6 shadow">
-        <h2 className="text-foreground mb-4 text-lg font-semibold">Trade</h2>
-        <p className="text-muted-foreground">
-          Buy and sell orders coming soon.
-        </p>
-      </div>
+      {account.status === "active" && (
+        <TradeForms accountId={account.id} holdings={account.holdings} />
+      )}
+
+      <TradeHistory accountId={account.id} />
     </div>
   );
 }
