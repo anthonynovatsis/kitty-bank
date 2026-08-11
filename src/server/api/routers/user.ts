@@ -596,6 +596,69 @@ export const userRouter = createTRPCRouter({
         }),
       ),
 
+    /**
+     * Delete a transaction and replay the position without it.
+     *
+     * The only honest way to say a trade did not happen. Selling to undo a
+     * mistaken buy would fabricate a disposal and invent a realised gain; this
+     * removes the row and recomputes from what is left.
+     *
+     * Later sales are recomputed rather than preserved, and that is correct: if
+     * the buy did not happen, the shares they disposed of came from somewhere
+     * else, so their cost and their gain genuinely were different. A history the
+     * deletion would make *impossible* rather than merely different is refused
+     * by the replay, inside this transaction, so the row comes back.
+     */
+    deleteTransaction: protectedProcedure
+      .input(z.object({ transactionId: z.string() }))
+      .mutation(({ ctx, input }) =>
+        ctx.db.transaction(async (tx) => {
+          const userId = ctx.session.user.id;
+
+          const existing = await tx.query.investmentTransactions.findFirst({
+            where: eq(investmentTransactions.id, input.transactionId),
+          });
+
+          if (!existing) {
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: "Transaction not found",
+            });
+          }
+
+          assertActiveAccount(
+            await loadOwnInvestmentAccount(
+              tx,
+              existing.investmentAccountId,
+              userId,
+            ),
+          );
+
+          await tx
+            .delete(investmentTransactions)
+            .where(eq(investmentTransactions.id, input.transactionId));
+
+          /*
+           * A pending or rejected row never reached the position, so removing
+           * it changes nothing to replay. Only a settled one needs the rebuild.
+           */
+          const position =
+            existing.status === "executed"
+              ? await rebuildHolding(
+                  tx,
+                  existing.investmentAccountId,
+                  existing.symbol,
+                )
+              : null;
+
+          return {
+            deleted: existing,
+            quantity: position?.quantity ?? null,
+            totalCostBasis: position?.totalCostBasis ?? null,
+          };
+        }),
+      ),
+
     // Current positions in one of the user's own investment accounts
     getHoldings: protectedProcedure
       .input(z.object({ accountId: z.string() }))
