@@ -51,14 +51,14 @@ function sentenceCase(text: string) {
 export function statusTone(status: string): BadgeTone {
   switch (status) {
     case "active":
+    // The two settled states: money movements complete, trades execute.
     case "completed":
+    case "executed":
       return "positive";
     case "pending":
       return "warning";
     case "rejected":
       return "danger";
-    case "approved":
-      return "info";
     default:
       return "neutral";
   }

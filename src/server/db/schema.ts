@@ -299,7 +299,7 @@ export const investmentTransactions = sqliteTable(
       .text({ length: 50 })
       .notNull()
       .default("pending")
-      .$type<"pending" | "approved" | "rejected" | "executed">(),
+      .$type<"pending" | "rejected" | "executed">(),
     createdByUserId: d
       .text({ length: 255 })
       .notNull()
@@ -353,7 +353,7 @@ export const cashTransactions = sqliteTable(
       .text({ length: 50 })
       .notNull()
       .default("pending")
-      .$type<"pending" | "approved" | "rejected" | "completed">(),
+      .$type<"pending" | "rejected" | "completed">(),
     createdByUserId: d
       .text({ length: 255 })
       .notNull()
