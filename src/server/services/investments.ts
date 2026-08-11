@@ -28,6 +28,8 @@ export type InvestmentErrorKind =
   | "holding_not_found"
   | "insufficient_shares"
   | "invalid_quantity"
+  | "invalid_ratio"
+  | "fractional_split"
   | "unsettleable_type"
   | "already_decided"
   | "holding_changed";
@@ -39,6 +41,8 @@ const CODE_FOR_KIND: Record<InvestmentErrorKind, TRPCError["code"]> = {
   holding_not_found: "NOT_FOUND",
   insufficient_shares: "CONFLICT",
   invalid_quantity: "BAD_REQUEST",
+  invalid_ratio: "BAD_REQUEST",
+  fractional_split: "BAD_REQUEST",
   unsettleable_type: "CONFLICT",
   already_decided: "CONFLICT",
   holding_changed: "CONFLICT",
@@ -296,6 +300,130 @@ async function removeShares(
     .where(and(eq(holdings.id, holding.id), eq(holdings.quantity, 0)));
 
   return costRemoved;
+}
+
+/**
+ * A corporate action that restates the share count: a 2-for-1 split is
+ * `{ numerator: 2, denominator: 1 }`, a 1-for-5 consolidation is
+ * `{ numerator: 1, denominator: 5 }`.
+ */
+export type SplitRatio = { numerator: number; denominator: number };
+
+/**
+ * Where a split leaves the position.
+ *
+ * The ratio says what the corporate action was; `resultingQuantity` says what
+ * is actually held. Registries round, and the number on the statement is the
+ * authority — so an override is offered rather than a fraction being invented.
+ *
+ * Without one, a ratio that does not divide evenly is refused: that is the case
+ * where nobody has checked what the registry actually did.
+ */
+export function splitQuantity(
+  held: number,
+  ratio: SplitRatio,
+  resultingQuantity?: number,
+): number {
+  if (
+    !Number.isInteger(ratio.numerator) ||
+    !Number.isInteger(ratio.denominator) ||
+    ratio.numerator < 1 ||
+    ratio.denominator < 1
+  ) {
+    throw investmentError(
+      "invalid_ratio",
+      "A split ratio must be two whole numbers of one or more",
+    );
+  }
+
+  if (ratio.numerator === ratio.denominator) {
+    throw investmentError(
+      "invalid_ratio",
+      "A 1-for-1 split would not change the position",
+    );
+  }
+
+  if (resultingQuantity !== undefined) {
+    assertWholeQuantity(resultingQuantity);
+    return resultingQuantity;
+  }
+
+  const scaled = held * ratio.numerator;
+  if (scaled % ratio.denominator !== 0) {
+    throw investmentError(
+      "fractional_split",
+      `${ratio.numerator}-for-${ratio.denominator} on ${held} shares leaves a fraction. ` +
+        "Enter the share count from your statement instead.",
+    );
+  }
+
+  return scaled / ratio.denominator;
+}
+
+/**
+ * Restate a position's share count after a corporate action.
+ *
+ * `total_cost_basis` is deliberately untouched. A split changes how many pieces
+ * the holding is divided into, not what it cost — so the derived average per
+ * share moves and nothing else does. That is also what makes the override safe:
+ * matching the registry's share count cannot corrupt the basis, because the
+ * basis is not part of the calculation.
+ *
+ * Returns the delta, which is what the transaction row records: deltas compose,
+ * so a rebuild can fold buys, sells and splits in one pass.
+ */
+export async function settleSplit(
+  tx: Transaction,
+  input: {
+    investmentAccountId: string;
+    symbol: string;
+    ratio: SplitRatio;
+    resultingQuantity?: number;
+    transactionDate: Date;
+  },
+) {
+  assertActiveAccount(
+    await loadInvestmentAccount(tx, input.investmentAccountId),
+  );
+
+  const holding = await loadHolding(
+    tx,
+    input.investmentAccountId,
+    input.symbol,
+  );
+
+  const resulting = splitQuantity(
+    holding.quantity,
+    input.ratio,
+    input.resultingQuantity,
+  );
+
+  // Guarded on the quantity this was calculated from, for the same reason a
+  // sell is: the arithmetic must not be applied to a position that has moved.
+  const result = await tx
+    .update(holdings)
+    .set({
+      quantity: resulting,
+      lastTransactionDate: input.transactionDate,
+    })
+    .where(
+      and(eq(holdings.id, holding.id), eq(holdings.quantity, holding.quantity)),
+    );
+
+  if (result.rowsAffected === 0) {
+    throw investmentError(
+      "holding_changed",
+      `The position in ${holding.symbol} changed while the split was applied`,
+    );
+  }
+
+  return {
+    symbol: holding.symbol,
+    previousQuantity: holding.quantity,
+    resultingQuantity: resulting,
+    delta: resulting - holding.quantity,
+    totalCostBasis: holding.totalCostBasis,
+  };
 }
 
 /** What settling a trade did, for the caller to record on the transaction. */

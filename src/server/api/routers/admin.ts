@@ -11,6 +11,7 @@ import {
 import {
   assertSettleableTrade,
   investmentError,
+  settleSplit,
   settleTrade,
 } from "~/server/services/investments";
 import type { db as database } from "~/server/db";
@@ -510,6 +511,88 @@ export const adminRouter = createTRPCRouter({
           return { transaction: completed!, status: "completed" as const };
         });
       }),
+  }),
+
+  holdings: createTRPCRouter({
+    /**
+     * Apply a split or consolidation to a position.
+     *
+     * Admin-only and immediate: no user submits a corporate action, and an
+     * admin performing it *is* the approval, so this skips the queue entirely.
+     * The user-facing `assertSettleableTrade` still rejects the `split` type,
+     * which is what keeps it off the buy/sell path.
+     */
+    adjust: adminProcedure
+      .input(
+        z.object({
+          accountId: z.string(),
+          symbol: z.string().trim().min(1).max(20),
+          /** 2-for-1 is `{ numerator: 2, denominator: 1 }`. */
+          numerator: z.number().int().positive().max(1000),
+          denominator: z.number().int().positive().max(1000),
+          /**
+           * What the statement says is held afterwards. Overrides the ratio,
+           * because the registry has already done any rounding there was.
+           */
+          resultingQuantity: z.number().int().positive().optional(),
+          description: z.string().trim().max(500).optional(),
+          transactionDate: z
+            .date()
+            .refine(
+              (date) => date.getTime() <= Date.now(),
+              "Split date cannot be in the future",
+            )
+            .optional(),
+        }),
+      )
+      .mutation(({ ctx, input }) =>
+        ctx.db.transaction(async (tx) => {
+          const transactionDate = input.transactionDate ?? new Date();
+          const ratio = {
+            numerator: input.numerator,
+            denominator: input.denominator,
+          };
+
+          const outcome = await settleSplit(tx, {
+            investmentAccountId: input.accountId,
+            symbol: input.symbol,
+            ratio,
+            resultingQuantity: input.resultingQuantity,
+            transactionDate,
+          });
+
+          const label = `${input.numerator}-for-${input.denominator}`;
+
+          const [transaction] = await tx
+            .insert(investmentTransactions)
+            .values({
+              investmentAccountId: input.accountId,
+              transactionType: "split",
+              symbol: outcome.symbol,
+              // The delta, not the resulting total: deltas compose, so a
+              // rebuild can fold buys, sells and splits in one pass.
+              quantity: outcome.delta,
+              price: null,
+              // A split moves no money. Zero is the honest amount, not a
+              // placeholder — the cost basis is deliberately untouched.
+              amount: cents(0),
+              description:
+                input.description ??
+                `${label} ${outcome.delta >= 0 ? "split" : "consolidation"}: ` +
+                  `${outcome.previousQuantity} → ${outcome.resultingQuantity} shares`,
+              transactionDate,
+              // Applied on the spot, and by an admin — there is nothing left to
+              // approve, so it is recorded as decided by whoever did it.
+              status: "executed",
+              createdByUserId: ctx.session.user.id,
+              approvedByAdminId: ctx.session.user.id,
+              approvedAt: new Date(),
+            })
+            .returning();
+
+          return { transaction: transaction!, ...outcome };
+        }),
+      ),
   }),
 });
 

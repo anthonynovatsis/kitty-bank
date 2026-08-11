@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import { ADMIN_AUTH_FILE, USER_AUTH_FILE } from "../../playwright.config";
 import { ADMIN, USER } from "./credentials";
 import {
+  chooseOptionByLabel,
   ensureAccount,
   openAccount,
   readCostBasis,
@@ -166,6 +167,83 @@ test.describe("trades — auto-approved user", () => {
     await expect(
       history.locator('[data-testid="trade-row"]').first(),
     ).toContainText(/executed/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Corporate actions
+// ---------------------------------------------------------------------------
+
+test.describe("splits", () => {
+  test.use({ storageState: ADMIN_AUTH_FILE });
+
+  test("a 2-for-1 doubles the shares and leaves the cost basis alone", async ({
+    page,
+  }) => {
+    await openAccount(page, PORTFOLIO);
+    await submitTrade(page, {
+      mode: "buy",
+      symbol: "SPLITME",
+      quantity: 10,
+      price: 4,
+    });
+    await expect(page.locator('[data-testid="trade-result"]')).toBeVisible();
+
+    const costBefore = await readCostBasis(page);
+
+    await page.goto("/admin");
+    await page.click('[data-testid="tab-investment"]');
+
+    await chooseOptionByLabel(page, "adjust-account", PORTFOLIO);
+    await chooseOptionByLabel(page, "adjust-symbol", "SPLITME");
+    await page.fill('[data-testid="adjust-numerator"]', "2");
+    await page.fill('[data-testid="adjust-denominator"]', "1");
+    await page.click('[data-testid="submit-adjustment"]');
+
+    await expect(page.locator('[data-testid="adjustment-result"]')).toHaveText(
+      "SPLITME: 10 → 20 shares.",
+    );
+
+    await openAccount(page, PORTFOLIO);
+    const row = page
+      .locator('[data-testid="holdings-section"] tr', { hasText: "SPLITME" })
+      .first();
+    await expect(row).toContainText("20");
+    // The shares doubled; what they cost did not move.
+    await expect.poll(() => readCostBasis(page)).toBeCloseTo(costBefore, 2);
+  });
+
+  test("an uneven ratio is refused, and the statement's count accepted", async ({
+    page,
+  }) => {
+    await openAccount(page, PORTFOLIO);
+    await submitTrade(page, {
+      mode: "buy",
+      symbol: "ODDLOT",
+      quantity: 5,
+      price: 2,
+    });
+    await expect(page.locator('[data-testid="trade-result"]')).toBeVisible();
+
+    await page.goto("/admin");
+    await page.click('[data-testid="tab-investment"]');
+    await chooseOptionByLabel(page, "adjust-account", PORTFOLIO);
+    await chooseOptionByLabel(page, "adjust-symbol", "ODDLOT");
+    await page.fill('[data-testid="adjust-numerator"]', "3");
+    await page.fill('[data-testid="adjust-denominator"]', "2");
+    await page.click('[data-testid="submit-adjustment"]');
+
+    // 5 × 3 ÷ 2 is 7.5, and nobody has said what the registry did.
+    await expect(
+      page.locator('[data-testid="adjustment-error"]'),
+    ).toContainText("leaves a fraction");
+
+    // The statement says 8, so that is what is held.
+    await page.fill('[data-testid="adjust-resulting"]', "8");
+    await page.click('[data-testid="submit-adjustment"]');
+    await expect(page.locator('[data-testid="adjustment-result"]')).toHaveText(
+      "ODDLOT: 5 → 8 shares.",
+    );
   });
 });
 

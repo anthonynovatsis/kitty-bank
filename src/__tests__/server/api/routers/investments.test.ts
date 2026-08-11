@@ -459,6 +459,170 @@ describe("admin.transactions — investment trades", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Splits and consolidations
+// ---------------------------------------------------------------------------
+
+describe("admin.holdings.adjust", () => {
+  const { db, migrate } = createTestDb();
+  let admin: FakeUser;
+  let owner: FakeUser;
+  let accountId: string;
+
+  beforeAll(async () => {
+    await migrate();
+    admin = await insertAdminUser(db);
+    owner = await insertUser(db, { requiresTransactionApproval: false });
+    accountId = await makeInvestmentAccount(db, admin, owner.id, {
+      name: "Portfolio",
+    });
+  });
+
+  async function position(symbol: string, quantity: number, price: number) {
+    await createTestCaller(db, makeSession(owner)).user.investments.buy({
+      accountId,
+      symbol,
+      quantity,
+      price,
+    });
+  }
+
+  it("doubles the shares on a 2-for-1 and leaves the cost alone", async () => {
+    await position("SPLIT", 10, 100);
+
+    const result = await createTestCaller(
+      db,
+      makeSession(admin),
+    ).admin.holdings.adjust({
+      accountId,
+      symbol: "split",
+      numerator: 2,
+      denominator: 1,
+    });
+
+    expect(result.resultingQuantity).toBe(20);
+    expect(result.delta).toBe(10);
+
+    const holding = await holdingIn(db, accountId, "SPLIT");
+    expect(holding?.quantity).toBe(20);
+    // A split changes how many pieces the holding is in, not what it cost.
+    expect(holding?.totalCostBasis).toBe(1000_00);
+  });
+
+  it("records the delta, at zero money", async () => {
+    const rows = await db.query.investmentTransactions.findMany({
+      where: (t, { eq: is }) => is(t.transactionType, "split"),
+    });
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.quantity).toBe(10);
+    expect(rows[0]!.amount).toBe(0);
+    expect(rows[0]!.price).toBeNull();
+    expect(rows[0]!.status).toBe("executed");
+    expect(rows[0]!.description).toContain("2-for-1");
+  });
+
+  it("reduces the shares on a consolidation", async () => {
+    await position("CONS", 100, 5);
+
+    const result = await createTestCaller(
+      db,
+      makeSession(admin),
+    ).admin.holdings.adjust({
+      accountId,
+      symbol: "CONS",
+      numerator: 1,
+      denominator: 5,
+    });
+
+    expect(result.resultingQuantity).toBe(20);
+    expect(result.delta).toBe(-80);
+
+    const holding = await holdingIn(db, accountId, "CONS");
+    expect(holding?.quantity).toBe(20);
+    expect(holding?.totalCostBasis).toBe(500_00);
+  });
+
+  /*
+   * The registry has already decided what a fraction becomes, so the statement
+   * is the authority and an override takes it verbatim. This is also why
+   * fractional shares never had to be solved for splits.
+   */
+  it("takes the share count from the statement when given one", async () => {
+    await position("ODD", 91, 10);
+
+    const result = await createTestCaller(
+      db,
+      makeSession(admin),
+    ).admin.holdings.adjust({
+      accountId,
+      symbol: "ODD",
+      numerator: 3,
+      denominator: 2,
+      // 91 × 3 ÷ 2 is 136.5; the registry rounded up.
+      resultingQuantity: 137,
+    });
+
+    expect(result.resultingQuantity).toBe(137);
+    expect((await holdingIn(db, accountId, "ODD"))?.quantity).toBe(137);
+  });
+
+  it("refuses an uneven ratio when no count is given", async () => {
+    await position("FRAC", 5, 10);
+
+    await expectInvestmentError(
+      createTestCaller(db, makeSession(admin)).admin.holdings.adjust({
+        accountId,
+        symbol: "FRAC",
+        numerator: 3,
+        denominator: 2,
+      }),
+      "fractional_split",
+    );
+
+    // The refusal left the position exactly as it was.
+    expect((await holdingIn(db, accountId, "FRAC"))?.quantity).toBe(5);
+  });
+
+  it("refuses a ratio that would change nothing", async () => {
+    await position("SAME", 4, 10);
+
+    await expectInvestmentError(
+      createTestCaller(db, makeSession(admin)).admin.holdings.adjust({
+        accountId,
+        symbol: "SAME",
+        numerator: 2,
+        denominator: 2,
+      }),
+      "invalid_ratio",
+    );
+  });
+
+  it("refuses a symbol that is not held", async () => {
+    await expectInvestmentError(
+      createTestCaller(db, makeSession(admin)).admin.holdings.adjust({
+        accountId,
+        symbol: "NOTHELD",
+        numerator: 2,
+        denominator: 1,
+      }),
+      "holding_not_found",
+    );
+  });
+
+  it("is closed to non-admins", async () => {
+    await expectTRPCError(
+      createTestCaller(db, makeSession(owner)).admin.holdings.adjust({
+        accountId,
+        symbol: "SPLIT",
+        numerator: 2,
+        denominator: 1,
+      }),
+      "FORBIDDEN",
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Reads and access control
 // ---------------------------------------------------------------------------
 
