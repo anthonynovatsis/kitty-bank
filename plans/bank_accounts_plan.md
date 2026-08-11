@@ -446,8 +446,8 @@ Phase 3's investment service should follow the same shape.
 
 ### Phase 3: Investment Transaction System (Complete Slice)
 **Admin API:**
-- [ ] Investment transaction approval endpoints
-- [ ] Holdings management operations
+- [x] Investment transaction approval endpoints
+- [x] Holdings management operations (splits and consolidations)
 
 **One approval queue, not two.** `admin.transactions.pending` returns cash and
 investment rows in a single list ordered by date, each carrying a discriminant
@@ -460,15 +460,36 @@ here forecloses it. Splitting a merged queue later would instead be a rewrite of
 the component, which is why this is the direction chosen now.
 
 **User Interface:**
-- [ ] Investment account detail pages with holdings
-- [ ] Buy/sell order forms  
-- [ ] Portfolio overview with current values
+- [x] Investment account detail pages with holdings
+- [x] Buy/sell order forms
+- [x] Portfolio overview (cost basis — see "Cost, not value" below)
 
 **Admin Interface:**
-- [ ] Investment transaction approval
-- [ ] Holdings adjustments for corporate actions
+- [x] Investment transaction approval
+- [x] Holdings adjustments for corporate actions
 
 **Result:** Working investment transaction system
+
+**A split moves no money.** `total_cost_basis` is untouched by a split or a
+consolidation — only the share count changes, and the derived average per share
+moves to match. Nothing divides in the money column, so none of the rounding
+care the pool needs applies here at all.
+
+The ratio says what the corporate action was; the resulting share count says
+what is actually held, and the admin can override it. Registries round, and the
+number on the statement is the authority — which is also why fractional shares
+never had to be solved for this: an override sidesteps the question entirely.
+Without one, a ratio that does not divide evenly is refused, so the guard still
+catches the case where nobody has checked the real number.
+
+Splits are admin-initiated and skip the approval queue: no user submits one, and
+an admin performing it *is* the approval. The user-facing `assertSettleableTrade`
+still rejects the type, which is what keeps it off the buy/sell path.
+
+The transaction row records the **delta** (+10, or −4 for a consolidation)
+rather than the resulting total, because deltas compose: a rebuild can fold
+buys, sells and splits in one pass without needing to know which entries are
+absolute. The ratio goes in the description.
 
 **Trades do not move cash.** `investment_accounts` has no settlement account, so
 a buy debits nothing and a sell credits nothing — the account is a position
@@ -495,10 +516,42 @@ free means it will mean something when prices arrive, rather than quietly
 changing definition under an unchanged label.
 
 ### Phase 4: Advanced Investment Features
+- [ ] Deleting a trade, and rebuilding the position from history
 - [ ] Dividend processing and DRIP functionality
 - [ ] Cost basis calculations and tax lot tracking  
 - [ ] Portfolio analytics and performance reporting
 - [ ] Market data integration for real-time values
+
+**Deleting a trade rebuilds the position.** Phase 3 ships with no way to undo a
+settled trade, which is a real hole: a wrong deposit can be answered with a
+compensating withdrawal, but a wrong *buy* can only be answered by selling —
+which fabricates a disposal, invents a realised gain, and leaves the basis wrong
+for whatever remains. There is no honest way to say "that trade did not happen".
+
+The fix is to make good on the promise already made — that `holdings` is a cache
+rebuildable from `investment_transactions`. One new primitive,
+`rebuildHolding(tx, accountId, symbol)`, folds every executed row for a symbol
+in date order into quantity and total cost, writing the result or deleting the
+row at zero. Delete then becomes "remove the row, then rebuild", and DRIP wants
+the same fold, so it is worth building first.
+
+**Later sales are recomputed, not preserved.** If a buy did not happen, the
+shares a later sale disposed of came from somewhere else, so its cost and
+realised gain genuinely were different — that is the reality, and Sharesight
+recomputes for the same reason. This works only because realised gain and cost
+removed are computed at settle time and never stored: there is no persisted
+figure to invalidate, so the journal stays the single source of truth. Do not
+add a `realised_gain` column without revisiting this.
+
+Retroactive change needs saying out loud in the UI, though: a delete can move a
+gain the user has already seen on screen.
+
+**A delete that makes history impossible is refused.** Removing a buy of 10 when
+a later sale of 8 exists would fold to a negative position. `rebuildHolding`
+validates as it folds and refuses, naming the sale that would break — inside the
+transaction, so the delete rolls back with it. The alternative, allowing a
+negative holding and flagging it, trades a clear refusal for a broken position
+and a cleanup job.
 
 ### Phase 5: Enhanced Features
 - [ ] Advanced reporting and analytics
