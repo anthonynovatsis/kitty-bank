@@ -536,7 +536,7 @@ changing definition under an unchanged label.
 
 ### Phase 4: Advanced Investment Features
 - [ ] Deleting a trade, and rebuilding the position from history
-- [ ] Dividend processing and DRIP functionality
+- [ ] Dividend processing and DRIP functionality (see the zero-quantity note below)
 - [ ] Cost basis calculations and tax lot tracking  
 - [ ] Portfolio analytics and performance reporting
 - [ ] Market data integration for real-time values
@@ -624,6 +624,25 @@ validates as it folds and refuses, naming the sale that would break — inside t
 transaction, so the delete rolls back with it. The alternative, allowing a
 negative holding and flagging it, trades a clear refusal for a broken position
 and a cleanup job.
+
+**A full exit zeroes the carried dividend cash.** Selling the last share deletes
+the holding row, taking `dividend_cash_balance` — the remainder DRIP carries
+forward — with it.
+
+The reinvestment setting going too does not matter: a position of zero shares
+receives no dividends, so there is nothing left for the flag to govern, and a
+re-buy is a fresh decision anyway.
+
+The cash is a real if small loss, accepted deliberately. Preserving it would not
+help: the remainder only ever clears by being topped up by the *next* dividend,
+and with no shares none arrives, so a kept balance is stranded rather than
+saved. What it actually needs is somewhere to go on exit — the same cash-in-lieu
+problem fractional shares have, and blocked on the same missing thing, a cash
+side to investment accounts. Bounded by one share price, so it is small by
+construction.
+
+Revisit with settlement accounts. Until then, a full exit should say what it is
+doing rather than dropping the balance silently.
 
 ### Phase 5: Enhanced Features
 - [ ] Advanced reporting and analytics
