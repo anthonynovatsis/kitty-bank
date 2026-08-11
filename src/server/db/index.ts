@@ -25,3 +25,12 @@ export const db = drizzle(client, { schema, casing: "snake_case" });
  * transaction have to name the handle they accept — this is that name.
  */
 export type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/**
+ * Either handle, for read-only helpers.
+ *
+ * A query that writes nothing works the same against the root connection or an
+ * open transaction, and helpers that only read should not force their callers
+ * to open one.
+ */
+export type Queryable = Pick<typeof db, "query">;

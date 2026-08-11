@@ -1,4 +1,4 @@
-import { desc, eq, inArray, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, or } from "drizzle-orm";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { MAX_AMOUNT_CENTS, sumCents, toCents } from "~/lib/money";
@@ -12,11 +12,23 @@ import {
   settleCashMovement,
 } from "~/server/services/cash";
 import { requiresApproval } from "~/server/services/approval";
-import type { Transaction } from "~/server/db";
+import {
+  type TradeType,
+  assertActiveAccount,
+  assertSufficientShares,
+  loadHolding,
+  loadInvestmentAccount,
+  normaliseSymbol,
+  settleTrade,
+  tradeAmount,
+} from "~/server/services/investments";
+import type { Queryable, Transaction } from "~/server/db";
 import {
   cashAccounts,
   cashTransactions,
+  holdings,
   investmentAccounts,
+  investmentTransactions,
 } from "~/server/db/schema";
 
 /** Money in, money out, or moved — as seen from one specific account. */
@@ -53,6 +65,32 @@ const transactionDateSchema = z
   )
   .optional();
 
+/** A share count. Whole shares only — the service and a CHECK both enforce it. */
+const quantitySchema = z
+  .number()
+  .int("Quantity must be a whole number of shares")
+  .positive("Quantity must be greater than zero")
+  .max(1_000_000_000);
+
+/** Per-share price, as a decimal, converted to cents at this boundary. */
+const priceSchema = z
+  .number()
+  .positive("Price must be greater than zero")
+  .finite()
+  .max(MAX_AMOUNT_CENTS / 100, "Price is too large");
+
+/** Transaction fee. Zero is normal, so this one is not `.positive()`. */
+const brokerageSchema = z
+  .number()
+  .min(0, "Brokerage cannot be negative")
+  .finite()
+  .max(MAX_AMOUNT_CENTS / 100, "Brokerage is too large")
+  .default(0);
+
+const symbolSchema = z.string().trim().min(1, "Symbol is required").max(20);
+
+const companyNameSchema = z.string().trim().max(255).optional();
+
 /** Load a cash account, asserting the caller owns it. */
 async function loadOwnAccount(
   tx: Transaction,
@@ -60,6 +98,21 @@ async function loadOwnAccount(
   userId: string,
 ) {
   const account = await loadCashAccount(tx, accountId);
+
+  if (account.userId !== userId) {
+    throw new TRPCError({ code: "FORBIDDEN" });
+  }
+
+  return account;
+}
+
+/** Load an investment account, asserting the caller owns it. */
+async function loadOwnInvestmentAccount(
+  tx: Transaction,
+  accountId: string,
+  userId: string,
+) {
+  const account = await loadInvestmentAccount(tx, accountId);
 
   if (account.userId !== userId) {
     throw new TRPCError({ code: "FORBIDDEN" });
@@ -366,6 +419,113 @@ export const userRouter = createTRPCRouter({
         });
       }),
   }),
+
+  investments: createTRPCRouter({
+    // Submit a buy into one of the user's own investment accounts
+    buy: protectedProcedure
+      .input(
+        z.object({
+          accountId: z.string(),
+          symbol: symbolSchema,
+          companyName: companyNameSchema,
+          quantity: quantitySchema,
+          price: priceSchema,
+          brokerage: brokerageSchema,
+          description: descriptionSchema,
+          transactionDate: transactionDateSchema,
+        }),
+      )
+      .mutation(({ ctx, input }) =>
+        ctx.db.transaction(async (tx) => {
+          const userId = ctx.session.user.id;
+          assertActiveAccount(
+            await loadOwnInvestmentAccount(tx, input.accountId, userId),
+          );
+
+          return submitTrade(tx, { ...input, transactionType: "buy", userId });
+        }),
+      ),
+
+    // Submit a sell from one of the user's own investment accounts
+    sell: protectedProcedure
+      .input(
+        z.object({
+          accountId: z.string(),
+          symbol: symbolSchema,
+          quantity: quantitySchema,
+          price: priceSchema,
+          brokerage: brokerageSchema,
+          description: descriptionSchema,
+          transactionDate: transactionDateSchema,
+        }),
+      )
+      .mutation(({ ctx, input }) =>
+        ctx.db.transaction(async (tx) => {
+          const userId = ctx.session.user.id;
+          assertActiveAccount(
+            await loadOwnInvestmentAccount(tx, input.accountId, userId),
+          );
+
+          // Fail fast rather than queueing a sale that can never settle. Shares
+          // are *not* reserved while pending — ownership is checked again at
+          // approval time, the same way a pending withdrawal re-checks funds.
+          const holding = await loadHolding(tx, input.accountId, input.symbol);
+          assertSufficientShares(holding, input.quantity);
+
+          return submitTrade(tx, { ...input, transactionType: "sell", userId });
+        }),
+      ),
+
+    // Current positions in one of the user's own investment accounts
+    getHoldings: protectedProcedure
+      .input(z.object({ accountId: z.string() }))
+      .query(async ({ ctx, input }) => {
+        await assertOwnInvestmentAccount(
+          ctx.db,
+          input.accountId,
+          ctx.session.user.id,
+        );
+
+        return ctx.db.query.holdings.findMany({
+          where: eq(holdings.investmentAccountId, input.accountId),
+          orderBy: [asc(holdings.symbol)],
+        });
+      }),
+
+    // Trade history for one of the user's own investment accounts
+    getTransactions: protectedProcedure
+      .input(
+        z.object({
+          accountId: z.string(),
+          /** Narrow to a single position, for the holding detail view. */
+          symbol: z.string().trim().min(1).max(20).optional(),
+          limit: z.number().int().min(1).max(200).default(50),
+        }),
+      )
+      .query(async ({ ctx, input }) => {
+        await assertOwnInvestmentAccount(
+          ctx.db,
+          input.accountId,
+          ctx.session.user.id,
+        );
+
+        return ctx.db.query.investmentTransactions.findMany({
+          where: and(
+            eq(investmentTransactions.investmentAccountId, input.accountId),
+            input.symbol
+              ? eq(investmentTransactions.symbol, normaliseSymbol(input.symbol))
+              : undefined,
+          ),
+          // Back-dated rows must slot into the right chronological position;
+          // createdAt only breaks ties within a day.
+          orderBy: [
+            desc(investmentTransactions.transactionDate),
+            desc(investmentTransactions.createdAt),
+          ],
+          limit: input.limit,
+        });
+      }),
+  }),
 });
 
 /**
@@ -421,5 +581,111 @@ async function submitCashTransaction(
     transaction: transaction!,
     status: transaction!.status,
     requiresApproval: needsApproval,
+  };
+}
+
+/**
+ * Ownership check for the read-only investment queries.
+ *
+ * Runs against the root db rather than inside a transaction, since nothing is
+ * being written. Closed accounts stay readable — only new trades are blocked.
+ */
+async function assertOwnInvestmentAccount(
+  db: Queryable,
+  accountId: string,
+  userId: string,
+) {
+  const account = await db.query.investmentAccounts.findFirst({
+    where: eq(investmentAccounts.id, accountId),
+    columns: { id: true, userId: true },
+  });
+
+  if (!account) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Investment account not found",
+    });
+  }
+  if (account.userId !== userId) {
+    throw new TRPCError({ code: "FORBIDDEN" });
+  }
+}
+
+/**
+ * Record a trade and, when the user is trusted, settle it straight away. Runs
+ * inside the caller's transaction, so a failed settlement takes the transaction
+ * row down with it.
+ */
+async function submitTrade(
+  tx: Transaction,
+  input: {
+    transactionType: TradeType;
+    accountId: string;
+    symbol: string;
+    companyName?: string;
+    quantity: number;
+    price: number;
+    brokerage: number;
+    description?: string;
+    /** When the trade happened. Defaults to now. */
+    transactionDate?: Date;
+    userId: string;
+  },
+) {
+  const price = toCents(input.price);
+  const brokerage = toCents(input.brokerage);
+  // Derived, never accepted: quantity, price, amount and brokerage are all
+  // stored, so an entered amount is a number free to contradict the other three.
+  const amount = tradeAmount(
+    input.transactionType,
+    input.quantity,
+    price,
+    brokerage,
+  );
+
+  const trade = {
+    transactionType: input.transactionType,
+    investmentAccountId: input.accountId,
+    symbol: normaliseSymbol(input.symbol),
+    companyName: input.companyName ?? null,
+    quantity: input.quantity,
+    price,
+    brokerage,
+    amount,
+    transactionDate: input.transactionDate ?? new Date(),
+  };
+
+  const needsApproval = await requiresApproval(tx, input.userId);
+
+  const [transaction] = await tx
+    .insert(investmentTransactions)
+    .values({
+      investmentAccountId: trade.investmentAccountId,
+      transactionType: trade.transactionType,
+      symbol: trade.symbol,
+      quantity: trade.quantity,
+      price: trade.price,
+      amount: trade.amount,
+      brokerage: trade.brokerage,
+      description: input.description ?? null,
+      transactionDate: trade.transactionDate,
+      /*
+       * `approved` is never written. A trade that needs no approval settles
+       * here, and one that does is settled by the admin in the same database
+       * transaction that decides it — so there is no moment at which a row is
+       * approved but not yet applied to the holdings.
+       */
+      status: needsApproval ? "pending" : "executed",
+      createdByUserId: input.userId,
+    })
+    .returning();
+
+  const outcome = needsApproval ? null : await settleTrade(tx, trade);
+
+  return {
+    transaction: transaction!,
+    status: transaction!.status,
+    requiresApproval: needsApproval,
+    realisedGain: outcome?.realisedGain ?? null,
   };
 }
