@@ -727,6 +727,7 @@ describe("user.investments.adjustHolding", () => {
       symbol: "QUEUED",
       quantity: 10,
       price: 10,
+      transactionDate: new Date("2026-01-01"),
     });
     const firstBuy = await db.query.investmentTransactions.findMany({
       where: (t, { eq: is }) => is(t.symbol, "QUEUED"),
@@ -737,11 +738,13 @@ describe("user.investments.adjustHolding", () => {
       action: "approve",
     });
 
+    // Dated after the buy below, so the shares that buy adds are pre-split.
     const submitted = await userCaller.user.investments.adjustHolding({
       accountId: supervisedAccount,
       symbol: "QUEUED",
       numerator: 2,
       denominator: 1,
+      transactionDate: new Date("2026-03-01"),
     });
     expect(submitted.status).toBe("pending");
     expect(submitted.outcome).toBeNull();
@@ -751,15 +754,16 @@ describe("user.investments.adjustHolding", () => {
     );
 
     /*
-     * A second buy settles while the split waits. The ratio is applied to the
-     * position as it stands at approval, not as it stood at submission — which
-     * is why the row stores the ratio rather than a precomputed delta.
+     * A second buy settles while the split waits. The ratio applies to the
+     * position the split's date finds, not to a delta fixed when it was
+     * submitted — which is why the row stores the ratio.
      */
     const second = await userCaller.user.investments.buy({
       accountId: supervisedAccount,
       symbol: "QUEUED",
       quantity: 5,
       price: 10,
+      transactionDate: new Date("2026-02-01"),
     });
     await adminCaller.admin.transactions.approve({
       kind: "investment",
@@ -773,9 +777,236 @@ describe("user.investments.adjustHolding", () => {
       action: "approve",
     });
 
-    // 15 shares by then, not the 10 held when the split was submitted.
+    // 15 shares by March, not the 10 held when the split was submitted.
     expect((await holdingIn(db, supervisedAccount, "QUEUED"))?.quantity).toBe(
       30,
+    );
+  });
+
+  /*
+   * The other side of the same rule. Shares acquired *after* a split's date are
+   * already post-split shares, so the ratio must not reach them — which the
+   * date-ordered replay handles and applying at approval time would not.
+   */
+  it("does not double shares bought after the split's date", async () => {
+    const supervised = await insertUser(db, {
+      requiresTransactionApproval: true,
+    });
+    const account = await makeInvestmentAccount(db, admin, supervised.id, {
+      name: "Post-split",
+    });
+    const userCaller = createTestCaller(db, makeSession(supervised));
+    const adminCaller = createTestCaller(db, makeSession(admin));
+
+    const approve = async (transactionId: string) =>
+      adminCaller.admin.transactions.approve({
+        kind: "investment",
+        transactionId,
+        action: "approve",
+      });
+
+    const first = await userCaller.user.investments.buy({
+      accountId: account,
+      symbol: "POST",
+      quantity: 10,
+      price: 10,
+      transactionDate: new Date("2026-01-01"),
+    });
+    await approve(first.transaction.id);
+
+    const split = await userCaller.user.investments.adjustHolding({
+      accountId: account,
+      symbol: "POST",
+      numerator: 2,
+      denominator: 1,
+      transactionDate: new Date("2026-02-01"),
+    });
+
+    const later = await userCaller.user.investments.buy({
+      accountId: account,
+      symbol: "POST",
+      quantity: 5,
+      price: 10,
+      transactionDate: new Date("2026-03-01"),
+    });
+    await approve(later.transaction.id);
+
+    // Approved last, dated in the middle: 10 doubled to 20, then 5 added.
+    await approve(split.transaction.id);
+
+    expect((await holdingIn(db, account, "POST"))?.quantity).toBe(25);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Deleting a transaction
+// ---------------------------------------------------------------------------
+
+describe("user.investments.deleteTransaction", () => {
+  const { db, migrate } = createTestDb();
+  let admin: FakeUser;
+  let owner: FakeUser;
+  let accountId: string;
+
+  beforeAll(async () => {
+    await migrate();
+    admin = await insertAdminUser(db);
+    owner = await insertUser(db, { requiresTransactionApproval: false });
+    accountId = await makeInvestmentAccount(db, admin, owner.id, {
+      name: "Portfolio",
+    });
+  });
+
+  function caller() {
+    return createTestCaller(db, makeSession(owner));
+  }
+
+  it("removes a mistaken buy and replays the position without it", async () => {
+    await caller().user.investments.buy({
+      accountId,
+      symbol: "OOPS",
+      quantity: 10,
+      price: 10,
+    });
+    const mistake = await caller().user.investments.buy({
+      accountId,
+      symbol: "OOPS",
+      quantity: 100,
+      price: 10,
+      description: "fat-fingered",
+    });
+
+    const result = await caller().user.investments.deleteTransaction({
+      transactionId: mistake.transaction.id,
+    });
+
+    expect(result.quantity).toBe(10);
+    expect(result.totalCostBasis).toBe(100_00);
+
+    const holding = await holdingIn(db, accountId, "OOPS");
+    expect(holding?.quantity).toBe(10);
+    expect(holding?.totalCostBasis).toBe(100_00);
+  });
+
+  /*
+   * The reality the plan committed to: if the buy did not happen, the shares a
+   * later sale disposed of came from somewhere else, so its cost was different.
+   */
+  it("recomputes a later sale against the corrected history", async () => {
+    const dear = await caller().user.investments.buy({
+      accountId,
+      symbol: "AFTER",
+      quantity: 10,
+      price: 30,
+      transactionDate: new Date("2026-01-01"),
+    });
+    await caller().user.investments.buy({
+      accountId,
+      symbol: "AFTER",
+      quantity: 10,
+      price: 10,
+      transactionDate: new Date("2026-02-01"),
+    });
+    await caller().user.investments.sell({
+      accountId,
+      symbol: "AFTER",
+      quantity: 10,
+      price: 50,
+      transactionDate: new Date("2026-03-01"),
+    });
+
+    // $400 pool over 20 shares, half sold, so $200 of cost went with them.
+    expect((await holdingIn(db, accountId, "AFTER"))?.totalCostBasis).toBe(
+      200_00,
+    );
+
+    await caller().user.investments.deleteTransaction({
+      transactionId: dear.transaction.id,
+    });
+
+    // Without the dearer buy the sale disposed of all 10 cheap shares.
+    const holding = await holdingIn(db, accountId, "AFTER");
+    expect(holding).toBeUndefined();
+  });
+
+  it("refuses a delete that would make the history impossible", async () => {
+    const buy = await caller().user.investments.buy({
+      accountId,
+      symbol: "NEEDED",
+      quantity: 10,
+      price: 10,
+      transactionDate: new Date("2026-01-01"),
+    });
+    await caller().user.investments.sell({
+      accountId,
+      symbol: "NEEDED",
+      quantity: 8,
+      price: 20,
+      transactionDate: new Date("2026-02-01"),
+    });
+
+    await expectInvestmentError(
+      caller().user.investments.deleteTransaction({
+        transactionId: buy.transaction.id,
+      }),
+      "history_inconsistent",
+    );
+
+    // The refusal rolled the deletion back: the row and the position stand.
+    const still = await db.query.investmentTransactions.findFirst({
+      where: (t, { eq: is }) => is(t.id, buy.transaction.id),
+    });
+    expect(still).toBeDefined();
+    expect((await holdingIn(db, accountId, "NEEDED"))?.quantity).toBe(2);
+  });
+
+  it("deletes a pending row without touching any position", async () => {
+    const supervised = await insertUser(db, {
+      requiresTransactionApproval: true,
+    });
+    const supervisedAccount = await makeInvestmentAccount(
+      db,
+      admin,
+      supervised.id,
+      { name: "Supervised" },
+    );
+    const userCaller = createTestCaller(db, makeSession(supervised));
+
+    const queued = await userCaller.user.investments.buy({
+      accountId: supervisedAccount,
+      symbol: "QUEUED",
+      quantity: 5,
+      price: 10,
+    });
+
+    const result = await userCaller.user.investments.deleteTransaction({
+      transactionId: queued.transaction.id,
+    });
+
+    // Never settled, so there is nothing to replay.
+    expect(result.quantity).toBeNull();
+    expect(await holdingIn(db, supervisedAccount, "QUEUED")).toBeUndefined();
+  });
+
+  it("is closed to anyone but the account holder", async () => {
+    const stranger = await insertUser(db, {
+      requiresTransactionApproval: false,
+    });
+    const mine = await caller().user.investments.buy({
+      accountId,
+      symbol: "MINE",
+      quantity: 1,
+      price: 10,
+    });
+
+    await expectTRPCError(
+      createTestCaller(
+        db,
+        makeSession(stranger),
+      ).user.investments.deleteTransaction({
+        transactionId: mine.transaction.id,
+      }),
+      "FORBIDDEN",
     );
   });
 });

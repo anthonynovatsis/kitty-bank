@@ -511,13 +511,18 @@ queues it for a supervised one. An admin does not come into it for an account
 that does not need approval — the same principle as every other operation here.
 
 That is what decides the row's shape. A split can sit pending, and the ratio
-applies to whatever is held *when it settles* — a buy that lands in between is
-part of the position it acts on. So the row stores the **action**, not its
+applies to the position **its own date** finds — not the position at submission,
+and not the position at approval. So the row stores the **action**, not its
 effect: `split_numerator` and `split_denominator`, with `quantity` holding the
 statement's share count as an override, or null meaning "work it out from the
-ratio". A delta computed at submission would be wrong by the time it was used.
-Covered by a test that queues a split, settles a further buy, and asserts the
-ratio applied to the larger position.
+ratio". A delta fixed at submission would be wrong by the time it was used.
+
+The date is what matters, because shares acquired after a split are already
+post-split shares and the ratio must not reach them. Two tests hold the line
+from both directions: a buy dated *before* a queued split is doubled by it, and
+a buy dated *after* one is not, however the approvals happen to be ordered.
+Applying at settlement time would get the second case wrong, which is what the
+out-of-order replay exists to prevent.
 
 Buys and sells go the other way round — they store the quantity and price
 submitted, and are not re-derived at approval, because re-pricing a trade
