@@ -663,6 +663,7 @@ async function submitTrade(
       investmentAccountId: trade.investmentAccountId,
       transactionType: trade.transactionType,
       symbol: trade.symbol,
+      companyName: trade.companyName,
       quantity: trade.quantity,
       price: trade.price,
       amount: trade.amount,

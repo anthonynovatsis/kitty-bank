@@ -799,8 +799,10 @@ describe("admin.transactions.pending", () => {
     const rows = await caller.admin.transactions.pending();
 
     expect(rows).toHaveLength(1);
-    expect(rows[0]!.status).toBe("pending");
-    expect(rows[0]!.cashAccountId).toBe(supervisedAccount);
+    // Everything in the queue is pending by definition — the row carries the
+    // kind instead, so `approve` knows which table the id belongs to.
+    expect(rows[0]!.kind).toBe("cash");
+    expect(rows[0]!.account.id).toBe(supervisedAccount);
   });
 
   it("includes the submitting user and the account", async () => {
@@ -808,7 +810,7 @@ describe("admin.transactions.pending", () => {
     const rows = await caller.admin.transactions.pending();
 
     expect(rows[0]!.createdBy.email).toBe(supervised.email);
-    expect(rows[0]!.cashAccount.accountName).toBe("Queue Account");
+    expect(rows[0]!.account.accountName).toBe("Queue Account");
   });
 });
 

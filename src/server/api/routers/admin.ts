@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { eq, and, asc, like } from "drizzle-orm";
+import { eq, and, like } from "drizzle-orm";
 import { createTRPCRouter, adminProcedure } from "~/server/api/trpc";
 import { cents, sumCents } from "~/lib/money";
 import {
@@ -9,9 +9,16 @@ import {
   settleCashMovement,
 } from "~/server/services/cash";
 import {
+  assertSettleableTrade,
+  investmentError,
+  settleTrade,
+} from "~/server/services/investments";
+import type { db as database } from "~/server/db";
+import {
   cashAccounts,
   cashTransactions,
   investmentAccounts,
+  investmentTransactions,
   users,
   userSettings,
 } from "~/server/db/schema";
@@ -329,48 +336,116 @@ export const adminRouter = createTRPCRouter({
   }),
 
   transactions: createTRPCRouter({
-    // The approval queue: every cash transaction awaiting a decision
+    /**
+     * The approval queue: everything awaiting a decision, of either kind.
+     *
+     * One list rather than one per kind. An admin triages by what arrived
+     * first, not by what sort of thing it is, and two queues would be two
+     * places to forget to look. Each row carries a `kind` so `approve` can
+     * route it and the table can render the details that only apply to it.
+     */
     pending: adminProcedure.query(async ({ ctx }) => {
-      const rows = await ctx.db.query.cashTransactions.findMany({
-        where: eq(cashTransactions.status, "pending"),
-        with: {
-          cashAccount: {
-            columns: {
-              id: true,
-              accountName: true,
-              accountNumber: true,
-              balance: true,
-              status: true,
+      const [cash, investments] = await Promise.all([
+        ctx.db.query.cashTransactions.findMany({
+          where: eq(cashTransactions.status, "pending"),
+          with: {
+            cashAccount: {
+              columns: {
+                id: true,
+                accountName: true,
+                accountNumber: true,
+                balance: true,
+                status: true,
+              },
+            },
+            toAccount: {
+              columns: { id: true, accountName: true, accountNumber: true },
+            },
+            createdBy: {
+              columns: { id: true, name: true, email: true },
             },
           },
-          fromAccount: {
-            columns: { id: true, accountName: true, accountNumber: true },
+        }),
+        ctx.db.query.investmentTransactions.findMany({
+          where: eq(investmentTransactions.status, "pending"),
+          with: {
+            investmentAccount: {
+              columns: {
+                id: true,
+                accountName: true,
+                accountNumber: true,
+                status: true,
+              },
+            },
+            createdBy: {
+              columns: { id: true, name: true, email: true },
+            },
           },
-          toAccount: {
-            columns: { id: true, accountName: true, accountNumber: true },
-          },
-          createdBy: {
-            columns: { id: true, name: true, email: true },
-          },
-        },
-        // Oldest *submission* first — the queue is worked front to back.
-        // Deliberately not transactionDate: back-dating records when the money
-        // moved, and must not let a request jump the queue.
-        orderBy: [asc(cashTransactions.createdAt)],
-      });
+        }),
+      ]);
 
-      return rows;
+      const queue = [
+        ...cash.map((row) => ({
+          kind: "cash" as const,
+          id: row.id,
+          transactionType: row.transactionType,
+          amount: row.amount,
+          description: row.description,
+          transactionDate: row.transactionDate,
+          createdAt: row.createdAt,
+          createdBy: row.createdBy,
+          account: row.cashAccount,
+          /** Shown so an admin can see whether the money is still there. */
+          balance: row.cashAccount.balance,
+          /** The far side of a transfer; null for anything else. */
+          counterparty:
+            row.transactionType === "transfer" ? row.toAccount : null,
+        })),
+        ...investments.map((row) => ({
+          kind: "investment" as const,
+          id: row.id,
+          transactionType: row.transactionType,
+          amount: row.amount,
+          description: row.description,
+          transactionDate: row.transactionDate,
+          createdAt: row.createdAt,
+          createdBy: row.createdBy,
+          account: row.investmentAccount,
+          symbol: row.symbol,
+          quantity: row.quantity,
+          price: row.price,
+          brokerage: row.brokerage,
+        })),
+      ];
+
+      // Oldest *submission* first — the queue is worked front to back.
+      // Deliberately not transactionDate: back-dating records when the money
+      // moved, and must not let a request jump the queue.
+      return queue.sort(
+        (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
+      );
     }),
 
-    // Approve (settling the balances) or reject a pending cash transaction
+    /**
+     * Approve (settling it) or reject a pending transaction of either kind.
+     *
+     * `kind` comes back from `pending` on the row itself, so the caller never
+     * has to guess which table an id belongs to — and a cash id cannot be
+     * passed off as an investment one, since it simply will not be found.
+     */
     approve: adminProcedure
       .input(
         z.object({
+          kind: z.enum(["cash", "investment"]).default("cash"),
           transactionId: z.string(),
           action: z.enum(["approve", "reject"]),
         }),
       )
       .mutation(async ({ ctx, input }) => {
+        if (input.kind === "investment") {
+          return decideTrade(ctx, input);
+        }
+
         const existing = await ctx.db.query.cashTransactions.findFirst({
           where: eq(cashTransactions.id, input.transactionId),
         });
@@ -437,6 +512,87 @@ export const adminRouter = createTRPCRouter({
       }),
   }),
 });
+
+/**
+ * The investment half of `transactions.approve`.
+ *
+ * Split out rather than inlined because the two kinds share only their shape:
+ * different table, different service, different terminal status. What they do
+ * share is the rule that the decision and its effect are one database
+ * transaction — if `settleTrade` refuses because the position was sold out from
+ * under a queued sale, the status change rolls back with it and the item stays
+ * in the queue for the admin to see.
+ */
+async function decideTrade(
+  ctx: { db: typeof database; session: { user: { id: string } } },
+  input: { transactionId: string; action: "approve" | "reject" },
+) {
+  const existing = await ctx.db.query.investmentTransactions.findFirst({
+    where: eq(investmentTransactions.id, input.transactionId),
+  });
+
+  if (!existing) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Transaction not found",
+    });
+  }
+
+  if (existing.status !== "pending") {
+    throw investmentError(
+      "already_decided",
+      `Transaction is already ${existing.status}`,
+    );
+  }
+
+  const adminId = ctx.session.user.id;
+  const approvedAt = new Date();
+
+  if (input.action === "reject") {
+    const [rejected] = await ctx.db
+      .update(investmentTransactions)
+      .set({ status: "rejected", approvedByAdminId: adminId, approvedAt })
+      .where(eq(investmentTransactions.id, input.transactionId))
+      .returning();
+
+    return { transaction: rejected!, status: "rejected" as const };
+  }
+
+  // Bind to a local const so the narrowing survives into the closure below.
+  const transactionType = existing.transactionType;
+  assertSettleableTrade(transactionType);
+
+  /*
+   * A pending trade stored the quantity and price it was submitted at, so the
+   * amount is not recomputed here — re-deriving it would silently re-price a
+   * trade the user submitted days ago.
+   */
+  return ctx.db.transaction(async (tx) => {
+    const outcome = await settleTrade(tx, {
+      transactionType,
+      investmentAccountId: existing.investmentAccountId,
+      symbol: existing.symbol,
+      companyName: existing.companyName,
+      quantity: existing.quantity!,
+      price: existing.price!,
+      brokerage: existing.brokerage,
+      amount: existing.amount,
+      transactionDate: existing.transactionDate,
+    });
+
+    const [executed] = await tx
+      .update(investmentTransactions)
+      .set({ status: "executed", approvedByAdminId: adminId, approvedAt })
+      .where(eq(investmentTransactions.id, input.transactionId))
+      .returning();
+
+    return {
+      transaction: executed!,
+      status: "executed" as const,
+      realisedGain: outcome.realisedGain,
+    };
+  });
+}
 
 // Helper function to generate unique account numbers
 function generateAccountNumber(): string {

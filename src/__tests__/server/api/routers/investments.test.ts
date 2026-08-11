@@ -264,6 +264,201 @@ describe("user.investments — supervised user", () => {
 });
 
 // ---------------------------------------------------------------------------
+// The merged approval queue
+// ---------------------------------------------------------------------------
+
+describe("admin.transactions — investment trades", () => {
+  const { db, migrate } = createTestDb();
+  let admin: FakeUser;
+  let supervised: FakeUser;
+  let accountId: string;
+  let cashAccountId: string;
+
+  beforeAll(async () => {
+    await migrate();
+    admin = await insertAdminUser(db);
+    supervised = await insertUser(db, { requiresTransactionApproval: true });
+    accountId = await makeInvestmentAccount(db, admin, supervised.id, {
+      name: "Portfolio",
+    });
+
+    const adminCaller = createTestCaller(db, makeSession(admin));
+    const cash = await adminCaller.admin.accounts.create({
+      userId: supervised.id,
+      accountType: "cash",
+      accountName: "Checking",
+      cashAccountType: "checking",
+    });
+    cashAccountId = cash.account!.id;
+  });
+
+  it("queues both kinds in one list, oldest submission first", async () => {
+    const caller = createTestCaller(db, makeSession(supervised));
+
+    await caller.user.cash.deposit({ accountId: cashAccountId, amount: 100 });
+    await caller.user.investments.buy({
+      accountId,
+      symbol: "AAPL",
+      companyName: "Apple",
+      quantity: 5,
+      price: 100,
+    });
+
+    const queue = await createTestCaller(
+      db,
+      makeSession(admin),
+    ).admin.transactions.pending();
+
+    expect(queue.map((row) => row.kind)).toEqual(["cash", "investment"]);
+
+    const trade = queue[1]!;
+    expect(trade.kind).toBe("investment");
+    if (trade.kind !== "investment") throw new Error("expected a trade");
+    expect(trade.symbol).toBe("AAPL");
+    expect(trade.quantity).toBe(5);
+    expect(trade.account.accountName).toBe("Portfolio");
+  });
+
+  it("approving a buy opens the position and keeps the company name", async () => {
+    const queue = await createTestCaller(
+      db,
+      makeSession(admin),
+    ).admin.transactions.pending();
+    const trade = queue.find((row) => row.kind === "investment")!;
+
+    const result = await createTestCaller(
+      db,
+      makeSession(admin),
+    ).admin.transactions.approve({
+      kind: "investment",
+      transactionId: trade.id,
+      action: "approve",
+    });
+
+    expect(result.status).toBe("executed");
+    expect(result.transaction.approvedByAdminId).toBe(admin.id);
+
+    const holding = await holdingIn(db, accountId, "AAPL");
+    expect(holding?.quantity).toBe(5);
+    // The name typed at submission survived the wait in the queue.
+    expect(holding?.companyName).toBe("Apple");
+  });
+
+  it("rejecting a trade leaves the holdings untouched", async () => {
+    const userCaller = createTestCaller(db, makeSession(supervised));
+    const submitted = await userCaller.user.investments.buy({
+      accountId,
+      symbol: "MSFT",
+      quantity: 3,
+      price: 50,
+    });
+
+    const result = await createTestCaller(
+      db,
+      makeSession(admin),
+    ).admin.transactions.approve({
+      kind: "investment",
+      transactionId: submitted.transaction.id,
+      action: "reject",
+    });
+
+    expect(result.status).toBe("rejected");
+    expect(await holdingIn(db, accountId, "MSFT")).toBeUndefined();
+  });
+
+  it("refuses to decide the same trade twice", async () => {
+    const userCaller = createTestCaller(db, makeSession(supervised));
+    const submitted = await userCaller.user.investments.buy({
+      accountId,
+      symbol: "TWICE",
+      quantity: 1,
+      price: 10,
+    });
+
+    const adminCaller = createTestCaller(db, makeSession(admin));
+    await adminCaller.admin.transactions.approve({
+      kind: "investment",
+      transactionId: submitted.transaction.id,
+      action: "approve",
+    });
+
+    await expectInvestmentError(
+      adminCaller.admin.transactions.approve({
+        kind: "investment",
+        transactionId: submitted.transaction.id,
+        action: "approve",
+      }),
+      "already_decided",
+    );
+  });
+
+  /*
+   * Shares are not reserved while a sale waits in the queue, so the position
+   * can be gone by the time an admin gets to it. The refusal and the status
+   * change share one database transaction: the trade must stay pending rather
+   * than settle against a position that no longer exists.
+   */
+  it("keeps a sale pending when the shares went while it queued", async () => {
+    const userCaller = createTestCaller(db, makeSession(supervised));
+    const adminCaller = createTestCaller(db, makeSession(admin));
+
+    const buy = await userCaller.user.investments.buy({
+      accountId,
+      symbol: "VANISH",
+      quantity: 4,
+      price: 25,
+    });
+    await adminCaller.admin.transactions.approve({
+      kind: "investment",
+      transactionId: buy.transaction.id,
+      action: "approve",
+    });
+
+    const sale = await userCaller.user.investments.sell({
+      accountId,
+      symbol: "VANISH",
+      quantity: 4,
+      price: 30,
+    });
+
+    // Sold out from under the queued request by a second, faster sale.
+    await db.delete(holdings).where(eq(holdings.symbol, "VANISH"));
+
+    await expectInvestmentError(
+      adminCaller.admin.transactions.approve({
+        kind: "investment",
+        transactionId: sale.transaction.id,
+        action: "approve",
+      }),
+      "holding_not_found",
+    );
+
+    const after = await db.query.investmentTransactions.findFirst({
+      where: (t, { eq: is }) => is(t.id, sale.transaction.id),
+    });
+    expect(after?.status).toBe("pending");
+    expect(after?.approvedByAdminId).toBeNull();
+  });
+
+  it("does not let a cash id be decided as a trade", async () => {
+    const userCaller = createTestCaller(db, makeSession(supervised));
+    const deposit = await userCaller.user.cash.deposit({
+      accountId: cashAccountId,
+      amount: 5,
+    });
+
+    await expectTRPCError(
+      createTestCaller(db, makeSession(admin)).admin.transactions.approve({
+        kind: "investment",
+        transactionId: deposit.transaction.id,
+        action: "approve",
+      }),
+      "NOT_FOUND",
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Reads and access control
 // ---------------------------------------------------------------------------
 

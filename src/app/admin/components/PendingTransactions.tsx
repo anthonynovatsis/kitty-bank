@@ -75,6 +75,7 @@ export function PendingTransactions() {
                 <th className="pr-4 pb-3 font-medium">Date</th>
                 <th className="pr-4 pb-3 font-medium">User</th>
                 <th className="pr-4 pb-3 font-medium">Type</th>
+                <th className="pr-4 pb-3 font-medium">Kind</th>
                 <th className="pr-4 pb-3 font-medium">Account</th>
                 <th className="pr-4 pb-3 font-medium">Description</th>
                 <th className="pr-4 pb-3 text-right font-medium">Amount</th>
@@ -124,17 +125,37 @@ export function PendingTransactions() {
                     >
                       {transaction.transactionType}
                     </td>
+                    <td
+                      data-testid="pending-transaction-kind"
+                      className="py-3 pr-4"
+                    >
+                      <StatusBadge tone="info">
+                        {transaction.kind === "cash" ? "Cash" : "Investment"}
+                      </StatusBadge>
+                    </td>
                     <td className="py-3 pr-4">
-                      <p>{transaction.cashAccount.accountName}</p>
-                      {transaction.transactionType === "transfer" &&
-                        transaction.toAccount && (
+                      <p>{transaction.account.accountName}</p>
+                      {transaction.kind === "cash" ? (
+                        <>
+                          {transaction.counterparty && (
+                            <p className="text-muted-foreground text-xs">
+                              → {transaction.counterparty.accountName}
+                            </p>
+                          )}
+                          {/* Whether the money is still there to move. */}
                           <p className="text-muted-foreground text-xs">
-                            → {transaction.toAccount.accountName}
+                            Balance: {formatCents(transaction.balance)}
                           </p>
-                        )}
-                      <p className="text-muted-foreground text-xs">
-                        Balance: {formatCents(transaction.cashAccount.balance)}
-                      </p>
+                        </>
+                      ) : (
+                        <p
+                          data-testid="pending-trade-detail"
+                          className="text-muted-foreground text-xs"
+                        >
+                          {transaction.quantity} × {transaction.symbol} @{" "}
+                          {formatCents(transaction.price!)}
+                        </p>
+                      )}
                     </td>
                     <td className="py-3 pr-4">
                       {transaction.description ?? "—"}
@@ -153,6 +174,7 @@ export function PendingTransactions() {
                           disabled={isDeciding}
                           onClick={() =>
                             decide.mutate({
+                              kind: transaction.kind,
                               transactionId: transaction.id,
                               action: "approve",
                             })
@@ -167,6 +189,7 @@ export function PendingTransactions() {
                           disabled={isDeciding}
                           onClick={() =>
                             decide.mutate({
+                              kind: transaction.kind,
                               transactionId: transaction.id,
                               action: "reject",
                             })

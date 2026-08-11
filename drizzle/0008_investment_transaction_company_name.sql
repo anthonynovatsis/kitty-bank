@@ -1,0 +1,1 @@
+ALTER TABLE `investment_transactions` ADD `company_name` text(255);

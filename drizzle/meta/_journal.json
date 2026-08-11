@@ -56,6 +56,13 @@
       "when": 1786402554741,
       "tag": "0007_unique_holding_per_symbol",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1786409803527,
+      "tag": "0008_investment_transaction_company_name",
+      "breakpoints": true
     }
   ]
 }

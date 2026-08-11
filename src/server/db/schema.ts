@@ -289,6 +289,12 @@ export const investmentTransactions = sqliteTable(
       .notNull()
       .$type<"buy" | "sell" | "dividend_reinvest" | "split">(),
     symbol: d.text({ length: 20 }).notNull(),
+    /*
+     * Carried on the transaction as well as the holding, because a buy can sit
+     * pending for days before it opens a position — and the name the user typed
+     * has to survive that wait to reach the holding it creates.
+     */
+    companyName: d.text({ length: 255 }),
     quantity: d.integer(),
     price: d.integer().$type<Cents>(),
     amount: d.integer().$type<Cents>().notNull(),
