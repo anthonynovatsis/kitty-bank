@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, inArray, or } from "drizzle-orm";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { MAX_AMOUNT_CENTS, sumCents, toCents } from "~/lib/money";
+import { MAX_AMOUNT_CENTS, cents, sumCents, toCents } from "~/lib/money";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import {
   type SettleableType,
@@ -19,7 +19,9 @@ import {
   loadHolding,
   loadInvestmentAccount,
   normaliseSymbol,
+  settleSplit,
   settleTrade,
+  splitQuantity,
   tradeAmount,
 } from "~/server/services/investments";
 import type { Queryable, Transaction } from "~/server/db";
@@ -473,6 +475,102 @@ export const userRouter = createTRPCRouter({
           assertSufficientShares(holding, input.quantity);
 
           return submitTrade(tx, { ...input, transactionType: "sell", userId });
+        }),
+      ),
+
+    /**
+     * Record a split or consolidation against one of the user's own positions.
+     *
+     * A corporate action is something the holder records about their own
+     * portfolio, so it follows the same approval rule as a trade rather than
+     * being an admin operation: a trusted user's applies immediately, a
+     * supervised user's queues.
+     */
+    adjustHolding: protectedProcedure
+      .input(
+        z.object({
+          accountId: z.string(),
+          symbol: symbolSchema,
+          /** 2-for-1 is `{ numerator: 2, denominator: 1 }`. */
+          numerator: z.number().int().positive().max(1000),
+          denominator: z.number().int().positive().max(1000),
+          /**
+           * The share count from the statement. Overrides the ratio, because
+           * the registry has already done whatever rounding there was.
+           */
+          resultingQuantity: quantitySchema.optional(),
+          description: descriptionSchema,
+          transactionDate: transactionDateSchema,
+        }),
+      )
+      .mutation(({ ctx, input }) =>
+        ctx.db.transaction(async (tx) => {
+          const userId = ctx.session.user.id;
+          assertActiveAccount(
+            await loadOwnInvestmentAccount(tx, input.accountId, userId),
+          );
+
+          const ratio = {
+            numerator: input.numerator,
+            denominator: input.denominator,
+          };
+          const transactionDate = input.transactionDate ?? new Date();
+
+          /*
+           * Validated even when it will only be queued, so an impossible
+           * adjustment is refused at the point it is made rather than sitting
+           * in a queue to be refused later. The position is loaded again at
+           * settlement, which is what makes the pending case correct: the ratio
+           * applies to whatever is held then.
+           */
+          const holding = await loadHolding(tx, input.accountId, input.symbol);
+          splitQuantity(holding.quantity, ratio, input.resultingQuantity);
+
+          const needsApproval = await requiresApproval(tx, userId);
+
+          const [transaction] = await tx
+            .insert(investmentTransactions)
+            .values({
+              investmentAccountId: input.accountId,
+              transactionType: "split",
+              symbol: holding.symbol,
+              // The request, not its effect: null means "use the ratio".
+              quantity: input.resultingQuantity ?? null,
+              splitNumerator: ratio.numerator,
+              splitDenominator: ratio.denominator,
+              price: null,
+              // A split moves no money. Zero is the honest amount rather than a
+              // placeholder — the cost basis is deliberately untouched.
+              amount: cents(0),
+              description:
+                input.description ??
+                `${ratio.numerator}-for-${ratio.denominator} ${
+                  ratio.numerator >= ratio.denominator
+                    ? "split"
+                    : "consolidation"
+                }`,
+              transactionDate,
+              status: needsApproval ? "pending" : "executed",
+              createdByUserId: userId,
+            })
+            .returning();
+
+          const outcome = needsApproval
+            ? null
+            : await settleSplit(tx, {
+                investmentAccountId: input.accountId,
+                symbol: input.symbol,
+                ratio,
+                resultingQuantity: input.resultingQuantity,
+                transactionDate,
+              });
+
+          return {
+            transaction: transaction!,
+            status: transaction!.status,
+            requiresApproval: needsApproval,
+            outcome,
+          };
         }),
       ),
 

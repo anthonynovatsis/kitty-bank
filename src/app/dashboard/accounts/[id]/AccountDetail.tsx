@@ -5,6 +5,7 @@ import { api } from "~/trpc/react";
 import { StatusBadge, statusTone } from "~/components/StatusBadge";
 import { CashTransactionForms } from "./CashTransactionForms";
 import { CashTransactionHistory } from "./CashTransactionHistory";
+import { HoldingAdjustment } from "./HoldingAdjustment";
 import { TradeForms } from "./TradeForms";
 import { TradeHistory } from "./TradeHistory";
 import { EmptyState } from "~/components/ThemeIllustration";
@@ -227,7 +228,13 @@ function InvestmentAccountDetail({ account }: { account: InvestmentAccount }) {
       </div>
 
       {account.status === "active" && (
-        <TradeForms accountId={account.id} holdings={account.holdings} />
+        <>
+          <TradeForms accountId={account.id} holdings={account.holdings} />
+          <HoldingAdjustment
+            accountId={account.id}
+            holdings={account.holdings}
+          />
+        </>
       )}
 
       <TradeHistory accountId={account.id} />

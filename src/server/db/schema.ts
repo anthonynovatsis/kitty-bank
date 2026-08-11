@@ -295,7 +295,19 @@ export const investmentTransactions = sqliteTable(
      * has to survive that wait to reach the holding it creates.
      */
     companyName: d.text({ length: 255 }),
+    /*
+     * What was asked for, not what it did. On a buy or sell this is the shares
+     * traded; on a split it is the resulting share count the holder read off
+     * their statement, and null means "work it out from the ratio".
+     *
+     * A split has to be stored as the action rather than its effect because it
+     * can sit pending: the ratio applies to whatever is held when it settles,
+     * which is not necessarily what was held when it was submitted.
+     */
     quantity: d.integer(),
+    /** A 2-for-1 split; a 1-for-5 consolidation. Null on anything but a split. */
+    splitNumerator: d.integer(),
+    splitDenominator: d.integer(),
     price: d.integer().$type<Cents>(),
     amount: d.integer().$type<Cents>().notNull(),
     brokerage: d.integer().$type<Cents>().notNull().default(cents(0)),

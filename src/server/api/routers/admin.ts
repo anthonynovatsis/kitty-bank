@@ -416,6 +416,16 @@ export const adminRouter = createTRPCRouter({
           quantity: row.quantity,
           price: row.price,
           brokerage: row.brokerage,
+          /* A split carries a ratio instead of a price: it is an instruction
+             about the share count, and its effect is not known until it
+             settles against whatever is held then. */
+          ratio:
+            row.splitNumerator && row.splitDenominator
+              ? {
+                  numerator: row.splitNumerator,
+                  denominator: row.splitDenominator,
+                }
+              : null,
         })),
       ];
 
@@ -512,88 +522,6 @@ export const adminRouter = createTRPCRouter({
         });
       }),
   }),
-
-  holdings: createTRPCRouter({
-    /**
-     * Apply a split or consolidation to a position.
-     *
-     * Admin-only and immediate: no user submits a corporate action, and an
-     * admin performing it *is* the approval, so this skips the queue entirely.
-     * The user-facing `assertSettleableTrade` still rejects the `split` type,
-     * which is what keeps it off the buy/sell path.
-     */
-    adjust: adminProcedure
-      .input(
-        z.object({
-          accountId: z.string(),
-          symbol: z.string().trim().min(1).max(20),
-          /** 2-for-1 is `{ numerator: 2, denominator: 1 }`. */
-          numerator: z.number().int().positive().max(1000),
-          denominator: z.number().int().positive().max(1000),
-          /**
-           * What the statement says is held afterwards. Overrides the ratio,
-           * because the registry has already done any rounding there was.
-           */
-          resultingQuantity: z.number().int().positive().optional(),
-          description: z.string().trim().max(500).optional(),
-          transactionDate: z
-            .date()
-            .refine(
-              (date) => date.getTime() <= Date.now(),
-              "Split date cannot be in the future",
-            )
-            .optional(),
-        }),
-      )
-      .mutation(({ ctx, input }) =>
-        ctx.db.transaction(async (tx) => {
-          const transactionDate = input.transactionDate ?? new Date();
-          const ratio = {
-            numerator: input.numerator,
-            denominator: input.denominator,
-          };
-
-          const outcome = await settleSplit(tx, {
-            investmentAccountId: input.accountId,
-            symbol: input.symbol,
-            ratio,
-            resultingQuantity: input.resultingQuantity,
-            transactionDate,
-          });
-
-          const label = `${input.numerator}-for-${input.denominator}`;
-
-          const [transaction] = await tx
-            .insert(investmentTransactions)
-            .values({
-              investmentAccountId: input.accountId,
-              transactionType: "split",
-              symbol: outcome.symbol,
-              // The delta, not the resulting total: deltas compose, so a
-              // rebuild can fold buys, sells and splits in one pass.
-              quantity: outcome.delta,
-              price: null,
-              // A split moves no money. Zero is the honest amount, not a
-              // placeholder — the cost basis is deliberately untouched.
-              amount: cents(0),
-              description:
-                input.description ??
-                `${label} ${outcome.delta >= 0 ? "split" : "consolidation"}: ` +
-                  `${outcome.previousQuantity} → ${outcome.resultingQuantity} shares`,
-              transactionDate,
-              // Applied on the spot, and by an admin — there is nothing left to
-              // approve, so it is recorded as decided by whoever did it.
-              status: "executed",
-              createdByUserId: ctx.session.user.id,
-              approvedByAdminId: ctx.session.user.id,
-              approvedAt: new Date(),
-            })
-            .returning();
-
-          return { transaction: transaction!, ...outcome };
-        }),
-      ),
-  }),
 });
 
 /**
@@ -641,15 +569,48 @@ async function decideTrade(
     return { transaction: rejected!, status: "rejected" as const };
   }
 
-  // Bind to a local const so the narrowing survives into the closure below.
+  // Bind to a local const so the narrowing survives into the closures below.
   const transactionType = existing.transactionType;
-  assertSettleableTrade(transactionType);
 
   /*
-   * A pending trade stored the quantity and price it was submitted at, so the
-   * amount is not recomputed here — re-deriving it would silently re-price a
-   * trade the user submitted days ago.
+   * A pending buy or sell stored the quantity and price it was submitted at, so
+   * the amount is not recomputed — re-deriving it would silently re-price a
+   * trade submitted days ago.
+   *
+   * A split is the opposite: it stored the *ratio*, and the ratio applies to
+   * whatever is held now. A buy that settled while the split queued is part of
+   * the position it acts on.
    */
+  if (transactionType === "split") {
+    return ctx.db.transaction(async (tx) => {
+      const outcome = await settleSplit(tx, {
+        investmentAccountId: existing.investmentAccountId,
+        symbol: existing.symbol,
+        ratio: {
+          numerator: existing.splitNumerator!,
+          denominator: existing.splitDenominator!,
+        },
+        resultingQuantity: existing.quantity ?? undefined,
+        transactionDate: existing.transactionDate,
+      });
+
+      const [executed] = await tx
+        .update(investmentTransactions)
+        .set({ status: "executed", approvedByAdminId: adminId, approvedAt })
+        .where(eq(investmentTransactions.id, input.transactionId))
+        .returning();
+
+      return {
+        transaction: executed!,
+        status: "executed" as const,
+        realisedGain: null,
+        outcome,
+      };
+    });
+  }
+
+  assertSettleableTrade(transactionType);
+
   return ctx.db.transaction(async (tx) => {
     const outcome = await settleTrade(tx, {
       transactionType,
@@ -673,6 +634,7 @@ async function decideTrade(
       transaction: executed!,
       status: "executed" as const,
       realisedGain: outcome.realisedGain,
+      outcome: null,
     };
   });
 }

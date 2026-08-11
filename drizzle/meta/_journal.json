@@ -63,6 +63,13 @@
       "when": 1786409803527,
       "tag": "0008_investment_transaction_company_name",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1786443448760,
+      "tag": "0009_split_ratio_on_transactions",
+      "breakpoints": true
     }
   ]
 }

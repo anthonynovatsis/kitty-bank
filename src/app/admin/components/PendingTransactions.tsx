@@ -147,6 +147,19 @@ export function PendingTransactions() {
                             Balance: {formatCents(transaction.balance)}
                           </p>
                         </>
+                      ) : transaction.ratio ? (
+                        // A split has no price, and its effect is not known
+                        // until it settles against whatever is held then.
+                        <p
+                          data-testid="pending-trade-detail"
+                          className="text-muted-foreground text-xs"
+                        >
+                          {transaction.ratio.numerator}-for-
+                          {transaction.ratio.denominator} on{" "}
+                          {transaction.symbol}
+                          {transaction.quantity !== null &&
+                            ` → ${transaction.quantity} shares`}
+                        </p>
                       ) : (
                         <p
                           data-testid="pending-trade-detail"

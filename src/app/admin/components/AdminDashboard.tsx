@@ -6,7 +6,6 @@ import { StatusBadge, statusTone } from "~/components/StatusBadge";
 import { Button } from "~/components/ui/button";
 import { CreateAccountDialog } from "./CreateAccountDialog";
 import { PendingTransactions } from "./PendingTransactions";
-import { HoldingAdjustment } from "./HoldingAdjustment";
 import { EmptyState } from "~/components/ThemeIllustration";
 import { CardGridSkeleton } from "~/components/Skeletons";
 import { cents, formatCents, sumCents } from "~/lib/money";
@@ -261,7 +260,6 @@ export function AdminDashboard() {
               ))}
             </div>
           )}
-          <HoldingAdjustment accounts={investmentAccounts} />
         </div>
       )}
 

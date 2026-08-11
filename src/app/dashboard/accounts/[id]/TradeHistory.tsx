@@ -51,10 +51,16 @@ export function TradeHistory({ accountId }: { accountId: string }) {
                     {trade.symbol}
                   </td>
                   <td className="py-3 pr-4 text-right">
+                    {/* A split's share count is the count it produced, or a
+                        dash while it is still an instruction to apply a ratio. */}
                     {trade.quantity?.toLocaleString() ?? "—"}
                   </td>
                   <td className="py-3 pr-4 text-right">
-                    {trade.price === null ? "—" : formatCents(trade.price)}
+                    {trade.splitNumerator && trade.splitDenominator
+                      ? `${trade.splitNumerator}-for-${trade.splitDenominator}`
+                      : trade.price === null
+                        ? "—"
+                        : formatCents(trade.price)}
                   </td>
                   <td
                     data-testid="trade-amount"

@@ -181,6 +181,9 @@ test.describe("splits", () => {
     page,
   }) => {
     await openAccount(page, PORTFOLIO);
+    const beforeBuy = await readCostBasis(page);
+
+    // 10 shares at $4 adds exactly $40 of cost.
     await submitTrade(page, {
       mode: "buy",
       symbol: "SPLITME",
@@ -189,12 +192,11 @@ test.describe("splits", () => {
     });
     await expect(page.locator('[data-testid="trade-result"]')).toBeVisible();
 
-    const costBefore = await readCostBasis(page);
+    // Settle on the post-buy figure before using it as the reference: reading
+    // straight after the confirmation races the cache invalidation's refetch.
+    const costBefore = beforeBuy + 40;
+    await expect.poll(() => readCostBasis(page)).toBeCloseTo(costBefore, 2);
 
-    await page.goto("/admin");
-    await page.click('[data-testid="tab-investment"]');
-
-    await chooseOptionByLabel(page, "adjust-account", PORTFOLIO);
     await chooseOptionByLabel(page, "adjust-symbol", "SPLITME");
     await page.fill('[data-testid="adjust-numerator"]', "2");
     await page.fill('[data-testid="adjust-denominator"]', "1");
@@ -204,13 +206,14 @@ test.describe("splits", () => {
       "SPLITME: 10 → 20 shares.",
     );
 
-    await openAccount(page, PORTFOLIO);
     const row = page
       .locator('[data-testid="holdings-section"] tr', { hasText: "SPLITME" })
       .first();
+    // The share count landing at 20 proves the page has refetched, so the
+    // cost basis read after it is the post-split figure and not a stale one.
     await expect(row).toContainText("20");
     // The shares doubled; what they cost did not move.
-    await expect.poll(() => readCostBasis(page)).toBeCloseTo(costBefore, 2);
+    expect(await readCostBasis(page)).toBeCloseTo(costBefore, 2);
   });
 
   test("an uneven ratio is refused, and the statement's count accepted", async ({
@@ -225,9 +228,6 @@ test.describe("splits", () => {
     });
     await expect(page.locator('[data-testid="trade-result"]')).toBeVisible();
 
-    await page.goto("/admin");
-    await page.click('[data-testid="tab-investment"]');
-    await chooseOptionByLabel(page, "adjust-account", PORTFOLIO);
     await chooseOptionByLabel(page, "adjust-symbol", "ODDLOT");
     await page.fill('[data-testid="adjust-numerator"]', "3");
     await page.fill('[data-testid="adjust-denominator"]', "2");

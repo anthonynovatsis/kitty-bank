@@ -462,7 +462,7 @@ describe("admin.transactions — investment trades", () => {
 // Splits and consolidations
 // ---------------------------------------------------------------------------
 
-describe("admin.holdings.adjust", () => {
+describe("user.investments.adjustHolding", () => {
   const { db, migrate } = createTestDb();
   let admin: FakeUser;
   let owner: FakeUser;
@@ -491,16 +491,17 @@ describe("admin.holdings.adjust", () => {
 
     const result = await createTestCaller(
       db,
-      makeSession(admin),
-    ).admin.holdings.adjust({
+      makeSession(owner),
+    ).user.investments.adjustHolding({
       accountId,
       symbol: "split",
       numerator: 2,
       denominator: 1,
     });
 
-    expect(result.resultingQuantity).toBe(20);
-    expect(result.delta).toBe(10);
+    expect(result.status).toBe("executed");
+    expect(result.outcome?.resultingQuantity).toBe(20);
+    expect(result.outcome?.delta).toBe(10);
 
     const holding = await holdingIn(db, accountId, "SPLIT");
     expect(holding?.quantity).toBe(20);
@@ -508,13 +509,21 @@ describe("admin.holdings.adjust", () => {
     expect(holding?.totalCostBasis).toBe(1000_00);
   });
 
-  it("records the delta, at zero money", async () => {
+  /*
+   * The row records the action, not its effect. A split can sit pending, and
+   * the ratio applies to whatever is held when it settles — so a delta computed
+   * at submission would be wrong by the time it was used.
+   */
+  it("records the ratio, at zero money", async () => {
     const rows = await db.query.investmentTransactions.findMany({
       where: (t, { eq: is }) => is(t.transactionType, "split"),
     });
 
     expect(rows).toHaveLength(1);
-    expect(rows[0]!.quantity).toBe(10);
+    expect(rows[0]!.splitNumerator).toBe(2);
+    expect(rows[0]!.splitDenominator).toBe(1);
+    // Null means "work it out from the ratio" — no override was given.
+    expect(rows[0]!.quantity).toBeNull();
     expect(rows[0]!.amount).toBe(0);
     expect(rows[0]!.price).toBeNull();
     expect(rows[0]!.status).toBe("executed");
@@ -526,16 +535,16 @@ describe("admin.holdings.adjust", () => {
 
     const result = await createTestCaller(
       db,
-      makeSession(admin),
-    ).admin.holdings.adjust({
+      makeSession(owner),
+    ).user.investments.adjustHolding({
       accountId,
       symbol: "CONS",
       numerator: 1,
       denominator: 5,
     });
 
-    expect(result.resultingQuantity).toBe(20);
-    expect(result.delta).toBe(-80);
+    expect(result.outcome?.resultingQuantity).toBe(20);
+    expect(result.outcome?.delta).toBe(-80);
 
     const holding = await holdingIn(db, accountId, "CONS");
     expect(holding?.quantity).toBe(20);
@@ -552,8 +561,8 @@ describe("admin.holdings.adjust", () => {
 
     const result = await createTestCaller(
       db,
-      makeSession(admin),
-    ).admin.holdings.adjust({
+      makeSession(owner),
+    ).user.investments.adjustHolding({
       accountId,
       symbol: "ODD",
       numerator: 3,
@@ -562,7 +571,7 @@ describe("admin.holdings.adjust", () => {
       resultingQuantity: 137,
     });
 
-    expect(result.resultingQuantity).toBe(137);
+    expect(result.outcome?.resultingQuantity).toBe(137);
     expect((await holdingIn(db, accountId, "ODD"))?.quantity).toBe(137);
   });
 
@@ -570,7 +579,7 @@ describe("admin.holdings.adjust", () => {
     await position("FRAC", 5, 10);
 
     await expectInvestmentError(
-      createTestCaller(db, makeSession(admin)).admin.holdings.adjust({
+      createTestCaller(db, makeSession(owner)).user.investments.adjustHolding({
         accountId,
         symbol: "FRAC",
         numerator: 3,
@@ -587,7 +596,7 @@ describe("admin.holdings.adjust", () => {
     await position("SAME", 4, 10);
 
     await expectInvestmentError(
-      createTestCaller(db, makeSession(admin)).admin.holdings.adjust({
+      createTestCaller(db, makeSession(owner)).user.investments.adjustHolding({
         accountId,
         symbol: "SAME",
         numerator: 2,
@@ -599,7 +608,7 @@ describe("admin.holdings.adjust", () => {
 
   it("refuses a symbol that is not held", async () => {
     await expectInvestmentError(
-      createTestCaller(db, makeSession(admin)).admin.holdings.adjust({
+      createTestCaller(db, makeSession(owner)).user.investments.adjustHolding({
         accountId,
         symbol: "NOTHELD",
         numerator: 2,
@@ -609,15 +618,97 @@ describe("admin.holdings.adjust", () => {
     );
   });
 
-  it("is closed to non-admins", async () => {
+  it("is closed to anyone but the account holder", async () => {
+    const stranger = await insertUser(db, {
+      requiresTransactionApproval: false,
+    });
+
     await expectTRPCError(
-      createTestCaller(db, makeSession(owner)).admin.holdings.adjust({
+      createTestCaller(
+        db,
+        makeSession(stranger),
+      ).user.investments.adjustHolding({
         accountId,
         symbol: "SPLIT",
         numerator: 2,
         denominator: 1,
       }),
       "FORBIDDEN",
+    );
+  });
+
+  /*
+   * The whole point of moving this off the admin router: a corporate action is
+   * the holder recording something about their own portfolio, so it follows the
+   * same approval rule as a trade rather than needing an admin at all.
+   */
+  it("queues for a supervised holder, and the ratio applies at approval", async () => {
+    const supervised = await insertUser(db, {
+      requiresTransactionApproval: true,
+    });
+    const supervisedAccount = await makeInvestmentAccount(
+      db,
+      admin,
+      supervised.id,
+      { name: "Supervised" },
+    );
+    const userCaller = createTestCaller(db, makeSession(supervised));
+    const adminCaller = createTestCaller(db, makeSession(admin));
+
+    await userCaller.user.investments.buy({
+      accountId: supervisedAccount,
+      symbol: "QUEUED",
+      quantity: 10,
+      price: 10,
+    });
+    const firstBuy = await db.query.investmentTransactions.findMany({
+      where: (t, { eq: is }) => is(t.symbol, "QUEUED"),
+    });
+    await adminCaller.admin.transactions.approve({
+      kind: "investment",
+      transactionId: firstBuy[0]!.id,
+      action: "approve",
+    });
+
+    const submitted = await userCaller.user.investments.adjustHolding({
+      accountId: supervisedAccount,
+      symbol: "QUEUED",
+      numerator: 2,
+      denominator: 1,
+    });
+    expect(submitted.status).toBe("pending");
+    expect(submitted.outcome).toBeNull();
+    // Nothing moves until it is approved.
+    expect((await holdingIn(db, supervisedAccount, "QUEUED"))?.quantity).toBe(
+      10,
+    );
+
+    /*
+     * A second buy settles while the split waits. The ratio is applied to the
+     * position as it stands at approval, not as it stood at submission — which
+     * is why the row stores the ratio rather than a precomputed delta.
+     */
+    const second = await userCaller.user.investments.buy({
+      accountId: supervisedAccount,
+      symbol: "QUEUED",
+      quantity: 5,
+      price: 10,
+    });
+    await adminCaller.admin.transactions.approve({
+      kind: "investment",
+      transactionId: second.transaction.id,
+      action: "approve",
+    });
+
+    await adminCaller.admin.transactions.approve({
+      kind: "investment",
+      transactionId: submitted.transaction.id,
+      action: "approve",
+    });
+
+    // 15 shares by then, not the 10 held when the split was submitted.
+    expect((await holdingIn(db, supervisedAccount, "QUEUED"))?.quantity).toBe(
+      30,
     );
   });
 });

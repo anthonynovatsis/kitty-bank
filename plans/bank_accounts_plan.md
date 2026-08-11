@@ -129,7 +129,8 @@ This document outlines the plan to add bank account management functionality to 
 - `admin.transactions.pending` - List pending transactions (cash + investment)
 - `admin.transactions.approve` - Approve/reject transactions
 - `admin.transactions.list` - Transaction history with filters
-- `admin.holdings.adjust` - Manual holdings adjustments (splits, etc.)
+- (splits live on `user.investments.adjustHolding` — the holder submits them,
+  and they reach an admin only through the approval queue)
 
 #### User Management
 - `admin.users.list` - List users with account summaries
@@ -154,6 +155,7 @@ This document outlines the plan to add bank account management functionality to 
 - `user.investments.sell` - Submit sell order
 - `user.investments.getHoldings` - Get current holdings with market values
 - `user.investments.getTransactions` - Get investment transaction history (all or by symbol)
+- `user.investments.adjustHolding` - Record a split or consolidation
 - `user.investments.getHoldingDetail` - Get specific holding with its transaction history
 - `user.investments.updateDRIP` - Toggle dividend reinvestment
 
@@ -181,8 +183,11 @@ This document outlines the plan to add bank account management functionality to 
 
 #### `/admin/holdings` - Portfolio Management
 - System-wide holdings overview
-- Manual adjustments for corporate actions
 - Holdings reconciliation tools
+
+Corporate actions are *not* here: a split is the holder recording something
+about their own portfolio, so it is submitted from the account page and reaches
+an admin only when that user requires approval.
 
 ### User Interface
 
@@ -447,7 +452,7 @@ Phase 3's investment service should follow the same shape.
 ### Phase 3: Investment Transaction System (Complete Slice)
 **Admin API:**
 - [x] Investment transaction approval endpoints
-- [x] Holdings management operations (splits and consolidations)
+- [x] Splits and consolidations (user-submitted, admin-approved when required)
 
 **One approval queue, not two.** `admin.transactions.pending` returns cash and
 investment rows in a single list ordered by date, each carrying a discriminant
@@ -466,7 +471,7 @@ the component, which is why this is the direction chosen now.
 
 **Admin Interface:**
 - [x] Investment transaction approval
-- [x] Holdings adjustments for corporate actions
+- [x] Corporate actions in the approval queue
 
 **Result:** Working investment transaction system
 
@@ -482,14 +487,28 @@ never had to be solved for this: an override sidesteps the question entirely.
 Without one, a ratio that does not divide evenly is refused, so the guard still
 catches the case where nobody has checked the real number.
 
-Splits are admin-initiated and skip the approval queue: no user submits one, and
-an admin performing it *is* the approval. The user-facing `assertSettleableTrade`
-still rejects the type, which is what keeps it off the buy/sell path.
+**A split follows the same approval rule as a trade.** It is the holder
+recording something about their own portfolio, not an administrative act, so
+`user.investments.adjustHolding` settles it immediately for a trusted user and
+queues it for a supervised one. An admin does not come into it for an account
+that does not need approval — the same principle as every other operation here.
 
-The transaction row records the **delta** (+10, or −4 for a consolidation)
-rather than the resulting total, because deltas compose: a rebuild can fold
-buys, sells and splits in one pass without needing to know which entries are
-absolute. The ratio goes in the description.
+That is what decides the row's shape. A split can sit pending, and the ratio
+applies to whatever is held *when it settles* — a buy that lands in between is
+part of the position it acts on. So the row stores the **action**, not its
+effect: `split_numerator` and `split_denominator`, with `quantity` holding the
+statement's share count as an override, or null meaning "work it out from the
+ratio". A delta computed at submission would be wrong by the time it was used.
+Covered by a test that queues a split, settles a further buy, and asserts the
+ratio applied to the larger position.
+
+Buys and sells go the other way round — they store the quantity and price
+submitted, and are not re-derived at approval, because re-pricing a trade
+someone entered days ago would be the wrong kind of faithfulness.
+
+`assertSettleableTrade` still rejects `split`, which is what keeps corporate
+actions off the buy/sell path; the approval queue routes on the type before
+reaching it.
 
 **Trades do not move cash.** `investment_accounts` has no settlement account, so
 a buy debits nothing and a sell credits nothing — the account is a position
@@ -532,7 +551,8 @@ The fix is to make good on the promise already made — that `holdings` is a cac
 rebuildable from `investment_transactions`. One new primitive,
 `rebuildHolding(tx, accountId, symbol)`, folds every executed row for a symbol
 in date order into quantity and total cost, writing the result or deleting the
-row at zero. Delete then becomes "remove the row, then rebuild", and DRIP wants
+row at zero. Splits fold as `running = override ?? running * num / den`, which
+is why they store the ratio rather than a delta. Delete then becomes "remove the row, then rebuild", and DRIP wants
 the same fold, so it is worth building first.
 
 **Later sales are recomputed, not preserved.** If a buy did not happen, the
