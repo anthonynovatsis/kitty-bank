@@ -62,7 +62,8 @@ This document outlines the plan to add bank account management functionality to 
 - quantity: integer (current total whole shares/units)
 - total_cost_basis: integer cents (cost of the whole position; average derived)
 - dividend_reinvestment: boolean
-- dividend_cash_balance: decimal (fractional cash carried forward for DRIP)
+- dividend_cash_balance: integer cents (derived: the residual carried forward by
+  the most recent dividend — recorded on the transaction, not maintained here)
 - last_transaction_date: timestamp
 - created_at: timestamp
 - updated_at: timestamp
@@ -257,20 +258,36 @@ an admin only when that user requires approval.
    - Mark investment transaction 'executed'
 
 **Dividend Processing (DRIP enabled):**
-1. Calculate dividend amount for holding
-2. Add to existing dividend_cash_balance in holdings
-3. If total cash ≥ current share price:
-   - Create dividend_reinvest transaction for whole shares purchasable
-   - Update holding: add quantity, recalculate avg cost basis
-   - Update dividend_cash_balance with remainder
-4. If total cash < share price: Just update dividend_cash_balance
 
-**Example:**
-- Holding: 100 shares, dividend_cash_balance: $23.45
-- New dividend: $42.00, total available: $65.45
-- Share price: $31.20, can buy 2 shares ($62.40)
-- Create transaction: quantity=2, price=$31.20, amount=$62.40
-- Update holding: quantity=102, dividend_cash_balance=$3.05
+Recorded, not computed. This app tracks activity that happened elsewhere — buys
+carry the price actually paid, splits take the share count off the statement —
+and dividends are the same. The registry has already worked out how many shares
+the dividend bought and what it is holding back; re-deriving that here would
+produce a second number free to disagree with the statement in front of you.
+
+So a DRIP dividend records what the statement says:
+1. The dividend amount
+2. The shares allotted, and the price they were allotted at
+3. The residual carried forward
+
+**Example**, as a statement presents it:
+- Brought forward: $23.45, dividend: $42.00
+- 2 shares allotted at $31.20 — $62.40
+- Carried forward: $3.05
+
+The residual belongs on the *transaction*, not on the holding. It is a recorded
+figure like any other, and keeping it in the journal means
+`holdings.dividend_cash_balance` is derived — the residual from the most recent
+dividend — rather than separately maintained. `foldHistory` picks it up with
+everything else.
+
+That also settles what happens on a full exit: nothing. The cached copy goes
+with the holding row, the record does not, and if the position is re-opened the
+last statement still says what the registry was holding.
+
+Storing both the brought-forward and carried-forward figures is what makes the
+next statement checkable: if its opening balance disagrees with the last
+recorded closing one, something was missed.
 
 ### User-Level Transaction Approval
 
@@ -536,7 +553,7 @@ changing definition under an unchanged label.
 
 ### Phase 4: Advanced Investment Features
 - [ ] Deleting a trade, and rebuilding the position from history
-- [ ] Dividend processing and DRIP functionality (see the zero-quantity note below)
+- [ ] Dividend processing and DRIP functionality (recorded from statements — see below)
 - [ ] Cost basis calculations and tax lot tracking  
 - [ ] Portfolio analytics and performance reporting
 - [ ] Market data integration for real-time values
@@ -625,24 +642,21 @@ transaction, so the delete rolls back with it. The alternative, allowing a
 negative holding and flagging it, trades a clear refusal for a broken position
 and a cleanup job.
 
-**A full exit zeroes the carried dividend cash.** Selling the last share deletes
-the holding row, taking `dividend_cash_balance` — the remainder DRIP carries
-forward — with it.
+**The DRIP residual is derived, so a full exit costs nothing.** Selling the last
+share deletes the holding row, and with the residual recorded on each dividend
+transaction rather than maintained on the holding, that row is a cache like
+every other part of it. The record survives; only the copy goes.
 
-The reinvestment setting going too does not matter: a position of zero shares
-receives no dividends, so there is nothing left for the flag to govern, and a
-re-buy is a fresh decision anyway.
+`holdings.dividend_cash_balance` therefore becomes a derived column — the
+residual carried forward by the most recent dividend — and `foldHistory` reads
+it off the journal with everything else. This is the reason to put it there
+rather than on the holding: it keeps the position wholly derivable, which is the
+property the replay depends on.
 
-The cash is a real if small loss, accepted deliberately. Preserving it would not
-help: the remainder only ever clears by being topped up by the *next* dividend,
-and with no shares none arrives, so a kept balance is stranded rather than
-saved. What it actually needs is somewhere to go on exit — the same cash-in-lieu
-problem fractional shares have, and blocked on the same missing thing, a cash
-side to investment accounts. Bounded by one share price, so it is small by
-construction.
-
-Revisit with settlement accounts. Until then, a full exit should say what it is
-doing rather than dropping the balance silently.
+`dividend_reinvestment` stays a genuine setting on the holding, and stays
+underived. Losing it on a full exit is harmless — zero shares receive no
+dividends, so there is nothing for the flag to govern, and re-opening a position
+is a fresh decision.
 
 ### Phase 5: Enhanced Features
 - [ ] Advanced reporting and analytics
