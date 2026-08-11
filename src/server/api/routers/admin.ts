@@ -11,6 +11,8 @@ import {
 import {
   assertSettleableTrade,
   investmentError,
+  isOutOfOrder,
+  rebuildHolding,
   settleSplit,
   settleTrade,
 } from "~/server/services/investments";
@@ -581,8 +583,49 @@ async function decideTrade(
    * whatever is held now. A buy that settled while the split queued is part of
    * the position it acts on.
    */
-  if (transactionType === "split") {
-    return ctx.db.transaction(async (tx) => {
+  return ctx.db.transaction(async (tx) => {
+    /*
+     * Marked executed first, which the incremental path does not care about but
+     * the replay does: `rebuildHolding` folds executed rows, so a row still
+     * pending would be left out of the position it is supposed to join. Both
+     * happen in one transaction, so a refusal below still takes the status
+     * change with it.
+     */
+    const [executed] = await tx
+      .update(investmentTransactions)
+      .set({ status: "executed", approvedByAdminId: adminId, approvedAt })
+      .where(eq(investmentTransactions.id, input.transactionId))
+      .returning();
+
+    /*
+     * A trade approved today can be dated before things already settled — it
+     * sat in the queue while other trades went through, or it was back-dated
+     * when submitted. Applying it incrementally would put it at the end of a
+     * history it belongs in the middle of, so the position is replayed instead.
+     */
+    if (
+      await isOutOfOrder(
+        tx,
+        existing.investmentAccountId,
+        existing.symbol,
+        existing.transactionDate,
+      )
+    ) {
+      const position = await rebuildHolding(
+        tx,
+        existing.investmentAccountId,
+        existing.symbol,
+      );
+
+      return {
+        transaction: executed!,
+        status: "executed" as const,
+        realisedGain: position.realisedGains.get(existing.id) ?? null,
+        outcome: null,
+      };
+    }
+
+    if (transactionType === "split") {
       const outcome = await settleSplit(tx, {
         investmentAccountId: existing.investmentAccountId,
         symbol: existing.symbol,
@@ -594,24 +637,16 @@ async function decideTrade(
         transactionDate: existing.transactionDate,
       });
 
-      const [executed] = await tx
-        .update(investmentTransactions)
-        .set({ status: "executed", approvedByAdminId: adminId, approvedAt })
-        .where(eq(investmentTransactions.id, input.transactionId))
-        .returning();
-
       return {
         transaction: executed!,
         status: "executed" as const,
         realisedGain: null,
         outcome,
       };
-    });
-  }
+    }
 
-  assertSettleableTrade(transactionType);
+    assertSettleableTrade(transactionType);
 
-  return ctx.db.transaction(async (tx) => {
     const outcome = await settleTrade(tx, {
       transactionType,
       investmentAccountId: existing.investmentAccountId,
@@ -623,12 +658,6 @@ async function decideTrade(
       amount: existing.amount,
       transactionDate: existing.transactionDate,
     });
-
-    const [executed] = await tx
-      .update(investmentTransactions)
-      .set({ status: "executed", approvedByAdminId: adminId, approvedAt })
-      .where(eq(investmentTransactions.id, input.transactionId))
-      .returning();
 
     return {
       transaction: executed!,

@@ -434,6 +434,33 @@ export async function rebuildHolding(
 }
 
 /**
+ * Whether an entry belongs before something already settled.
+ *
+ * The test settlement uses to decide whether it may take the cheap path. A
+ * position with no history yet cannot be out of order, and neither can an entry
+ * dated on the same day as the latest — same-day entries are commutative for
+ * buys, and for anything else the tie is broken by insertion order, which is
+ * what incremental settlement applies anyway.
+ */
+export async function isOutOfOrder(
+  tx: Transaction,
+  investmentAccountId: string,
+  symbol: string,
+  transactionDate: Date,
+) {
+  const holding = await tx.query.holdings.findFirst({
+    where: and(
+      eq(holdings.investmentAccountId, investmentAccountId),
+      eq(holdings.symbol, normaliseSymbol(symbol)),
+    ),
+    columns: { lastTransactionDate: true },
+  });
+
+  const latest = holding?.lastTransactionDate;
+  return latest !== undefined && latest !== null && transactionDate < latest;
+}
+
+/**
  * Add shares to a position, creating it if this is the first buy.
  *
  * A single upsert rather than a read followed by an insert-or-update: the

@@ -13,12 +13,15 @@ import {
 } from "~/server/services/cash";
 import { requiresApproval } from "~/server/services/approval";
 import {
+  type Trade,
   type TradeType,
   assertActiveAccount,
   assertSufficientShares,
   loadHolding,
+  isOutOfOrder,
   loadInvestmentAccount,
   normaliseSymbol,
+  rebuildHolding,
   settleSplit,
   settleTrade,
   splitQuantity,
@@ -555,15 +558,34 @@ export const userRouter = createTRPCRouter({
             })
             .returning();
 
-          const outcome = needsApproval
-            ? null
-            : await settleSplit(tx, {
-                investmentAccountId: input.accountId,
-                symbol: input.symbol,
-                ratio,
-                resultingQuantity: input.resultingQuantity,
-                transactionDate,
-              });
+          /*
+           * A back-dated split replays for the same reason a back-dated trade
+           * does: applying its ratio to today's position would be applying it
+           * to shares it never covered.
+           */
+          const outOfOrder =
+            !needsApproval &&
+            (await isOutOfOrder(
+              tx,
+              input.accountId,
+              holding.symbol,
+              transactionDate,
+            ));
+
+          if (outOfOrder) {
+            await rebuildHolding(tx, input.accountId, holding.symbol);
+          }
+
+          const outcome =
+            needsApproval || outOfOrder
+              ? null
+              : await settleSplit(tx, {
+                  investmentAccountId: input.accountId,
+                  symbol: input.symbol,
+                  ratio,
+                  resultingQuantity: input.resultingQuantity,
+                  transactionDate,
+                });
 
           return {
             transaction: transaction!,
@@ -683,6 +705,43 @@ async function submitCashTransaction(
 }
 
 /**
+ * Settle a trade that needs no approval, and report what it realised.
+ *
+ * Back-dating is ordinary here — people record trades days after the fact — so
+ * an entry can easily belong before something already settled. Applying it
+ * incrementally would put it at the end of a history it belongs in the middle
+ * of, leaving every later sale costed against a pool that never existed. When
+ * that happens the position is replayed instead; otherwise settlement takes the
+ * cheap path, which is the overwhelming majority of the time.
+ *
+ * The transaction row is already inserted as executed, so the replay includes it.
+ */
+async function applyTrade(
+  tx: Transaction,
+  trade: Trade,
+  transactionId: string,
+) {
+  if (
+    await isOutOfOrder(
+      tx,
+      trade.investmentAccountId,
+      trade.symbol,
+      trade.transactionDate,
+    )
+  ) {
+    const position = await rebuildHolding(
+      tx,
+      trade.investmentAccountId,
+      trade.symbol,
+    );
+    return position.realisedGains.get(transactionId) ?? null;
+  }
+
+  const outcome = await settleTrade(tx, trade);
+  return outcome.realisedGain;
+}
+
+/**
  * Ownership check for the read-only investment queries.
  *
  * Runs against the root db rather than inside a transaction, since nothing is
@@ -779,12 +838,12 @@ async function submitTrade(
     })
     .returning();
 
-  const outcome = needsApproval ? null : await settleTrade(tx, trade);
-
   return {
     transaction: transaction!,
     status: transaction!.status,
     requiresApproval: needsApproval,
-    realisedGain: outcome?.realisedGain ?? null,
+    realisedGain: needsApproval
+      ? null
+      : await applyTrade(tx, trade, transaction!.id),
   };
 }

@@ -180,6 +180,46 @@ describe("user.investments — trusted user", () => {
     expect(holding?.lastTransactionDate).toEqual(new Date("2026-06-01"));
   });
 
+  /*
+   * Recording a trade days after the fact is ordinary, so an entry can easily
+   * belong before something already settled. Applying it incrementally would
+   * put it at the end of a history it belongs in the middle of, leaving the
+   * later sale costed against a pool that never existed.
+   */
+  it("replays the position when an entry is back-dated", async () => {
+    const caller = createTestCaller(db, makeSession(trusted));
+
+    await caller.user.investments.buy({
+      accountId,
+      symbol: "LATE",
+      quantity: 10,
+      price: 10,
+      transactionDate: new Date("2026-06-01"),
+    });
+    const sale = await caller.user.investments.sell({
+      accountId,
+      symbol: "LATE",
+      quantity: 10,
+      price: 20,
+      transactionDate: new Date("2026-07-01"),
+    });
+    expect(sale.realisedGain).toBe(100_00);
+
+    // Remembered late, and dated before the sale it partly funded.
+    await caller.user.investments.buy({
+      accountId,
+      symbol: "LATE",
+      quantity: 10,
+      price: 10,
+      transactionDate: new Date("2026-05-01"),
+    });
+
+    // 20 shares by July, 10 sold, so half the $200 pool went with them.
+    const holding = await holdingIn(db, accountId, "LATE");
+    expect(holding?.quantity).toBe(10);
+    expect(holding?.totalCostBasis).toBe(100_00);
+  });
+
   it("refuses to sell shares that are not held", async () => {
     const caller = createTestCaller(db, makeSession(trusted));
 
