@@ -555,6 +555,36 @@ row at zero. Splits fold as `running = override ?? running * num / den`, which
 is why they store the ratio rather than a delta. Delete then becomes "remove the row, then rebuild", and DRIP wants
 the same fold, so it is worth building first.
 
+**Approval order currently decides the outcome.** Settlement is incremental —
+each approval applies its effect to the cached holding — so two items pending at
+once produce different positions depending on which is approved first. Hold 10,
+queue a buy of 5 and a 2-for-1: split first gives 25, buy first gives 30.
+
+This is not something splits introduced. A sale removes a *proportion* of the
+pool as it stands, so it is order-sensitive too: on a pool of $1,000 over 10
+shares, a pending buy of 5 at $200 and a pending sale of 4 leave a basis of
+$1,467 if the buy settles first and $1,600 if the sale does. Same two
+transactions, different answer.
+
+The queue is ordered oldest-submission-first, so working top to bottom is
+usually right, but nothing enforces it — and submission order is not the order
+that matters when anything is back-dated.
+
+Folding by transaction date is what removes this, and it is the reason the fold
+below is the fix rather than a guard on the approval endpoint. A guard could
+refuse to approve an item while an earlier-dated one is still pending, but it
+would only cover things pending simultaneously: a buy back-dated to before an
+already-approved split still lands on top of it. Only recomputing from the
+journal puts that right.
+
+Note this only becomes automatic if **settlement itself** goes through the
+rebuild rather than staying incremental. That is a live decision: incremental
+settlement keeps the atomic `quantity = quantity ± ?` the concurrency rule asks
+for, while rebuilding on settle makes the position always equal the journal at
+the cost of reading history and writing an absolute value. The failure modes
+differ — a lost increment is corrupt permanently, a lost rebuild is repaired by
+running it again.
+
 **Later sales are recomputed, not preserved.** If a buy did not happen, the
 shares a later sale disposed of came from somewhere else, so its cost and
 realised gain genuinely were different — that is the reality, and Sharesight
