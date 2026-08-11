@@ -1,9 +1,13 @@
 import type { TRPCError } from "@trpc/server";
-import { and, eq, sql } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 
 import { cents, type Cents } from "~/lib/money";
 import type { Transaction } from "~/server/db";
-import { holdings, investmentAccounts } from "~/server/db/schema";
+import {
+  holdings,
+  investmentAccounts,
+  investmentTransactions,
+} from "~/server/db/schema";
 import { defineRuleErrors } from "./errors";
 
 /**
@@ -32,7 +36,8 @@ export type InvestmentErrorKind =
   | "fractional_split"
   | "unsettleable_type"
   | "already_decided"
-  | "holding_changed";
+  | "holding_changed"
+  | "history_inconsistent";
 
 /** tRPC code per kind. Malformed input is 400; state that forbids the operation is 409. */
 const CODE_FOR_KIND: Record<InvestmentErrorKind, TRPCError["code"]> = {
@@ -46,6 +51,7 @@ const CODE_FOR_KIND: Record<InvestmentErrorKind, TRPCError["code"]> = {
   unsettleable_type: "CONFLICT",
   already_decided: "CONFLICT",
   holding_changed: "CONFLICT",
+  history_inconsistent: "CONFLICT",
 };
 
 const errors = defineRuleErrors("investments", CODE_FOR_KIND);
@@ -211,6 +217,192 @@ export function assertSettleableTrade(
       `Cannot settle a "${transactionType}" transaction`,
     );
   }
+}
+
+/** A position as the journal describes it, before it is written anywhere. */
+export type FoldedPosition = {
+  quantity: number;
+  totalCostBasis: Cents;
+  companyName: string | null;
+  lastTransactionDate: Date | null;
+};
+
+/** One row as the fold needs to see it — the stored shape, narrowed. */
+type JournalEntry = {
+  id: string;
+  transactionType: string;
+  quantity: number | null;
+  amount: Cents;
+  companyName: string | null;
+  splitNumerator: number | null;
+  splitDenominator: number | null;
+  transactionDate: Date;
+};
+
+/**
+ * Replay a symbol's history into the position it implies.
+ *
+ * The fold, kept separate from the database so it can be reasoned about and
+ * tested on its own. Entries must arrive in transaction-date order — that is
+ * what makes the result independent of the order things were approved in, which
+ * incremental settlement cannot promise.
+ *
+ * Each type contributes what it means: a purchase adds shares and their cost, a
+ * sale removes shares and a *proportion* of the cost, and a split restates the
+ * count without touching the money.
+ */
+export function foldHistory(entries: readonly JournalEntry[]): FoldedPosition {
+  let quantity = 0;
+  let cost = 0;
+  let companyName: string | null = null;
+  let lastTransactionDate: Date | null = null;
+
+  for (const entry of entries) {
+    switch (entry.transactionType) {
+      // A reinvested dividend is a purchase; the only difference is where the
+      // money came from, which the holding does not record.
+      case "buy":
+      case "dividend_reinvest": {
+        quantity += entry.quantity ?? 0;
+        cost += entry.amount;
+        companyName ??= entry.companyName;
+        break;
+      }
+
+      case "sell": {
+        const sold = entry.quantity ?? 0;
+        if (sold > quantity) {
+          throw investmentError(
+            "history_inconsistent",
+            `A sale of ${sold} shares dated ${entry.transactionDate.toDateString()} ` +
+              `has only ${quantity} to sell by then`,
+          );
+        }
+        // The same proportional removal `removeShares` performs, so a replay
+        // reproduces what incremental settlement produced rather than drifting
+        // from it by a cent.
+        cost -= quantity === 0 ? 0 : Math.round((cost * sold) / quantity);
+        quantity -= sold;
+        break;
+      }
+
+      case "split": {
+        if (!entry.splitNumerator || !entry.splitDenominator) {
+          throw investmentError(
+            "history_inconsistent",
+            `A split dated ${entry.transactionDate.toDateString()} has no ratio`,
+          );
+        }
+        /*
+         * Refused here as well as at submission, because a replay can reach a
+         * split with a different position than it had when it settled — delete
+         * an earlier buy and a ratio that once divided evenly may not any more.
+         */
+        quantity = splitQuantity(
+          quantity,
+          {
+            numerator: entry.splitNumerator,
+            denominator: entry.splitDenominator,
+          },
+          entry.quantity ?? undefined,
+        );
+        break;
+      }
+
+      default:
+        throw investmentError(
+          "history_inconsistent",
+          `Cannot replay a "${entry.transactionType}" transaction`,
+        );
+    }
+
+    lastTransactionDate = entry.transactionDate;
+  }
+
+  return {
+    quantity,
+    totalCostBasis: cents(cost),
+    companyName,
+    lastTransactionDate,
+  };
+}
+
+/**
+ * Recompute a position from its transactions, and write the result.
+ *
+ * `holdings` is a cache; `investment_transactions` is the record. This is what
+ * makes that claim true rather than aspirational — and it is the reason a trade
+ * can be deleted at all, since removing a row and replaying is the only honest
+ * way to say "that did not happen".
+ *
+ * Only executed rows count. Pending and rejected ones have not happened, so
+ * they contribute nothing.
+ *
+ * Unlike settlement this writes absolute values rather than incrementing, which
+ * would be unsafe for a *cached* number under concurrent writers — but the
+ * numbers here are derived, so a rebuild that loses a race is repaired by
+ * running it again rather than being wrong forever.
+ */
+export async function rebuildHolding(
+  tx: Transaction,
+  investmentAccountId: string,
+  symbol: string,
+): Promise<FoldedPosition> {
+  const normalised = normaliseSymbol(symbol);
+
+  const entries = await tx.query.investmentTransactions.findMany({
+    where: and(
+      eq(investmentTransactions.investmentAccountId, investmentAccountId),
+      eq(investmentTransactions.symbol, normalised),
+      eq(investmentTransactions.status, "executed"),
+    ),
+    // Date first: this is the whole point. `createdAt` only breaks ties between
+    // things that happened on the same day.
+    orderBy: [
+      asc(investmentTransactions.transactionDate),
+      asc(investmentTransactions.createdAt),
+    ],
+  });
+
+  const position = foldHistory(entries);
+
+  // A position replayed to nothing is deleted rather than kept at zero, which
+  // is what settlement does when the last share is sold.
+  if (position.quantity === 0) {
+    await tx
+      .delete(holdings)
+      .where(
+        and(
+          eq(holdings.investmentAccountId, investmentAccountId),
+          eq(holdings.symbol, normalised),
+        ),
+      );
+    return position;
+  }
+
+  await tx
+    .insert(holdings)
+    .values({
+      investmentAccountId,
+      symbol: normalised,
+      companyName: position.companyName,
+      quantity: position.quantity,
+      totalCostBasis: position.totalCostBasis,
+      lastTransactionDate: position.lastTransactionDate,
+    })
+    .onConflictDoUpdate({
+      target: [holdings.investmentAccountId, holdings.symbol],
+      set: {
+        quantity: position.quantity,
+        totalCostBasis: position.totalCostBasis,
+        lastTransactionDate: position.lastTransactionDate,
+        // Deliberately not overwritten with null: the name is not derivable
+        // from a history whose naming buy may itself have been deleted.
+        companyName: sql`COALESCE(${holdings.companyName}, ${position.companyName})`,
+      },
+    });
+
+  return position;
 }
 
 /**
