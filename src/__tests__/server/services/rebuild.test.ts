@@ -52,6 +52,7 @@ describe("foldHistory", () => {
       totalCostBasis: 0,
       companyName: null,
       lastTransactionDate: null,
+      realisedGains: new Map(),
     });
   });
 
@@ -74,6 +75,43 @@ describe("foldHistory", () => {
 
     expect(position.quantity).toBe(6);
     expect(position.totalCostBasis).toBe(600_00);
+  });
+
+  /*
+   * Gains are computed rather than stored, so they are always what the current
+   * history implies. Delete an earlier buy and every later sale's gain moves —
+   * which is the whole point of replaying rather than remembering.
+   */
+  it("reports what each sale realised", () => {
+    const sale = entry("sell", { quantity: 4, amount: 470_00 });
+    const position = foldHistory([
+      entry("buy", { quantity: 10, amount: 1000_00 }),
+      sale,
+    ]);
+
+    // $470 of proceeds against the $400 those 4 shares cost.
+    expect(position.realisedGains.get(sale.id)).toBe(70_00);
+  });
+
+  it("moves an earlier sale's gain when the history behind it changes", () => {
+    const sale = entry("sell", {
+      quantity: 4,
+      amount: 470_00,
+      date: "2026-03-01",
+    });
+
+    const dear = foldHistory([
+      entry("buy", { quantity: 10, amount: 1000_00, date: "2026-01-01" }),
+      sale,
+    ]);
+    const cheap = foldHistory([
+      entry("buy", { quantity: 10, amount: 500_00, date: "2026-01-01" }),
+      sale,
+    ]);
+
+    expect(dear.realisedGains.get(sale.id)).toBe(70_00);
+    // The same sale, against shares that cost half as much.
+    expect(cheap.realisedGains.get(sale.id)).toBe(270_00);
   });
 
   it("restates the count on a split without touching the cost", () => {

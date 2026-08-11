@@ -237,6 +237,15 @@ export type FoldedPosition = {
   totalCostBasis: Cents;
   companyName: string | null;
   lastTransactionDate: Date | null;
+  /**
+   * What each sale realised, by transaction id.
+   *
+   * Computed here rather than stored, so it is always the figure the current
+   * history implies — delete an earlier buy and every later sale's gain moves,
+   * which is the behaviour a replay is supposed to produce. It also means a
+   * back-dated sale settled by rebuilding can still report what it made.
+   */
+  realisedGains: Map<string, Cents>;
 };
 
 /** One row as the fold needs to see it — the stored shape, narrowed. */
@@ -268,6 +277,7 @@ export function foldHistory(entries: readonly JournalEntry[]): FoldedPosition {
   let cost = 0;
   let companyName: string | null = null;
   let lastTransactionDate: Date | null = null;
+  const realisedGains = new Map<string, Cents>();
 
   for (const entry of entries) {
     switch (entry.transactionType) {
@@ -293,7 +303,12 @@ export function foldHistory(entries: readonly JournalEntry[]): FoldedPosition {
         // The same proportional removal `removeShares` performs, so a replay
         // reproduces what incremental settlement produced rather than drifting
         // from it by a cent.
-        cost -= quantity === 0 ? 0 : Math.round((cost * sold) / quantity);
+        const costRemoved =
+          quantity === 0 ? 0 : Math.round((cost * sold) / quantity);
+        // `amount` is already net of brokerage, so the fee reduces the gain
+        // rather than being counted twice.
+        realisedGains.set(entry.id, cents(entry.amount - costRemoved));
+        cost -= costRemoved;
         quantity -= sold;
         break;
       }
@@ -336,6 +351,7 @@ export function foldHistory(entries: readonly JournalEntry[]): FoldedPosition {
     totalCostBasis: cents(cost),
     companyName,
     lastTransactionDate,
+    realisedGains,
   };
 }
 
