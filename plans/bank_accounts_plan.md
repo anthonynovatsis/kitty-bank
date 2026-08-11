@@ -553,6 +553,7 @@ changing definition under an unchanged label.
 
 ### Phase 4: Advanced Investment Features
 - [ ] Deleting a trade, and rebuilding the position from history
+- [ ] Rebuild on out-of-order entry (see below); `last_transaction_date` advances only
 - [ ] Dividend processing and DRIP functionality (recorded from statements — see below)
 - [ ] Cost basis calculations and tax lot tracking  
 - [ ] Portfolio analytics and performance reporting
@@ -623,6 +624,32 @@ already reported to someone do not silently move under them.
 So the ordering sensitivity is documented behaviour, not a defect to engineer
 away. When something lands out of date order, the answer is to rebuild that one
 position.
+
+**Rebuild when the entry is out of order, increment otherwise.** Leaving that
+rebuild to somebody remembering to ask for it is the part that would not survive
+contact with use: forgetting a dividend and entering it later is an ordinary
+mistake, and the position would stay quietly wrong until noticed.
+
+So settlement takes the cheap path only when it is entitled to. If the incoming
+transaction is dated at or after everything already settled for that position,
+increment as now — atomic, O(1), the common case by a wide margin. If it is
+dated earlier, insert the row and rebuild the position instead.
+
+This is the targeted version of the question closed above, and it keeps what
+that decision was protecting: the ordinary path stays an atomic
+`quantity = quantity ± ?` with its check in the same statement, and figures move
+retroactively only when someone has actually entered something retroactive.
+
+Back-dating then simply works — the shares land at their date, later sales
+recompute their cost against the corrected pool, and recorded dividend residuals
+are undisturbed because the statements that carried them already accounted for
+whatever was missed.
+
+One fix this depends on: `last_transaction_date` is currently set to each
+settling transaction's own date, so a back-dated entry drags it *backwards*. It
+has to advance only, or the out-of-order test reads inverted. Comparing against
+`max(transaction_date)` from the journal is the alternative if the column turns
+out to be wanted for something else.
 
 **Later sales are recomputed, not preserved.** If a buy did not happen, the
 shares a later sale disposed of came from somewhere else, so its cost and
