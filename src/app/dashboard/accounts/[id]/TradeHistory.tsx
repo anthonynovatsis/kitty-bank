@@ -1,13 +1,39 @@
 "use client";
 
+import { useState } from "react";
 import { api } from "~/trpc/react";
 import { StatusBadge, statusTone } from "~/components/StatusBadge";
+import { Button } from "~/components/ui/button";
 import { TableSkeleton } from "~/components/Skeletons";
 import { formatCents } from "~/lib/money";
 
 export function TradeHistory({ accountId }: { accountId: string }) {
+  /*
+   * Which row is asking to be confirmed. Deleting is not undoable and it moves
+   * figures the user has already seen — later sales are recosted against the
+   * corrected history — so it takes two clicks and says what it will do.
+   */
+  const [confirming, setConfirming] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const utils = api.useUtils();
   const { data, isLoading } = api.user.investments.getTransactions.useQuery({
     accountId,
+  });
+
+  const remove = api.user.investments.deleteTransaction.useMutation({
+    onSuccess: () => {
+      setError(null);
+      setConfirming(null);
+      void utils.user.accounts.getDetails.invalidate({ accountId });
+      void utils.user.accounts.list.invalidate();
+      void utils.user.investments.getTransactions.invalidate({ accountId });
+      void utils.user.investments.getHoldings.invalidate({ accountId });
+    },
+    onError: (err) => {
+      setConfirming(null);
+      setError(err.message);
+    },
   });
 
   return (
@@ -35,7 +61,10 @@ export function TradeHistory({ accountId }: { accountId: string }) {
                 {/* Buys cost this, sells return it — the sign is carried by the
                     type column rather than by a minus that would read as a loss. */}
                 <th className="pr-4 pb-3 text-right font-medium">Amount</th>
-                <th className="pb-3 font-medium">Status</th>
+                <th className="pr-4 pb-3 font-medium">Status</th>
+                <th className="pb-3 font-medium">
+                  <span className="sr-only">Actions</span>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-border divide-y">
@@ -68,7 +97,7 @@ export function TradeHistory({ accountId }: { accountId: string }) {
                   >
                     {formatCents(trade.amount)}
                   </td>
-                  <td className="py-3">
+                  <td className="py-3 pr-4">
                     <StatusBadge
                       tone={statusTone(trade.status)}
                       testId="trade-status"
@@ -76,11 +105,63 @@ export function TradeHistory({ accountId }: { accountId: string }) {
                       {trade.status}
                     </StatusBadge>
                   </td>
+                  <td className="py-3">
+                    {confirming === trade.id ? (
+                      <div className="flex items-center gap-2">
+                        <span
+                          data-testid="delete-warning"
+                          className="text-muted-foreground text-xs"
+                        >
+                          Recalculates later trades.
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          data-testid="confirm-delete"
+                          disabled={remove.isPending}
+                          onClick={() =>
+                            remove.mutate({ transactionId: trade.id })
+                          }
+                        >
+                          Delete
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          data-testid="cancel-delete"
+                          onClick={() => setConfirming(null)}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        data-testid="delete-trade"
+                        onClick={() => {
+                          setError(null);
+                          setConfirming(trade.id);
+                        }}
+                      >
+                        Delete
+                      </Button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+      )}
+
+      {error && (
+        <p
+          data-testid="delete-error"
+          className="bg-tone-danger text-tone-danger-foreground mt-4 rounded-md p-3 text-sm"
+        >
+          {error}
+        </p>
       )}
     </div>
   );

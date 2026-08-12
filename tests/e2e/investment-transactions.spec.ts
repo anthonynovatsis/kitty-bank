@@ -171,6 +171,86 @@ test.describe("trades — auto-approved user", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Deleting a trade
+// ---------------------------------------------------------------------------
+
+test.describe("deleting a trade", () => {
+  test.use({ storageState: ADMIN_AUTH_FILE });
+
+  test("a mistaken buy can be removed and the position recomputes", async ({
+    page,
+  }) => {
+    await openAccount(page, PORTFOLIO);
+    const before = await readCostBasis(page);
+
+    await submitTrade(page, {
+      mode: "buy",
+      symbol: "MISTAKE",
+      quantity: 100,
+      price: 3,
+      description: "E2E fat finger",
+    });
+    await expect(page.locator('[data-testid="trade-result"]')).toBeVisible();
+    await expect.poll(() => readCostBasis(page)).toBeCloseTo(before + 300, 2);
+
+    const row = page
+      .locator('[data-testid="trade-row"]', { hasText: "MISTAKE" })
+      .first();
+    await row.locator('[data-testid="delete-trade"]').click();
+
+    // Deleting moves figures already on screen, so it says so and asks again.
+    await expect(row.locator('[data-testid="delete-warning"]')).toContainText(
+      "Recalculates later trades",
+    );
+    await row.locator('[data-testid="confirm-delete"]').click();
+
+    await expect(
+      page.locator('[data-testid="trade-row"]', { hasText: "MISTAKE" }),
+    ).toHaveCount(0);
+    await expect(
+      page.locator('[data-testid="holdings-section"]'),
+    ).not.toContainText("MISTAKE");
+    await expect.poll(() => readCostBasis(page)).toBeCloseTo(before, 2);
+  });
+
+  test("a delete the history depends on is refused", async ({ page }) => {
+    await openAccount(page, PORTFOLIO);
+
+    await submitTrade(page, {
+      mode: "buy",
+      symbol: "NEEDED",
+      quantity: 10,
+      price: 5,
+      date: "2026-01-05",
+    });
+    await expect(page.locator('[data-testid="trade-result"]')).toBeVisible();
+    await submitTrade(page, {
+      mode: "sell",
+      symbol: "NEEDED",
+      quantity: 8,
+      price: 7,
+      date: "2026-02-05",
+    });
+    await expect(page.locator('[data-testid="trade-result"]')).toBeVisible();
+
+    const buyRow = page
+      .locator('[data-testid="trade-row"]', { hasText: "NEEDED" })
+      .last();
+    await buyRow.locator('[data-testid="delete-trade"]').click();
+    await buyRow.locator('[data-testid="confirm-delete"]').click();
+
+    // The sale of 8 would have nothing behind it.
+    await expect(page.locator('[data-testid="delete-error"]')).toContainText(
+      "to sell by then",
+    );
+    // Refused, so the trade is still there.
+    await expect(
+      page.locator('[data-testid="trade-row"]', { hasText: "NEEDED" }),
+    ).toHaveCount(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Corporate actions
 // ---------------------------------------------------------------------------
 
