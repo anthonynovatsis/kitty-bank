@@ -171,6 +171,67 @@ test.describe("trades — auto-approved user", () => {
 });
 
 // ---------------------------------------------------------------------------
+// One position, in detail
+// ---------------------------------------------------------------------------
+
+test.describe("holding detail", () => {
+  test.use({ storageState: ADMIN_AUTH_FILE });
+
+  test("a holding opens onto its own history and realised gain", async ({
+    page,
+  }) => {
+    await openAccount(page, PORTFOLIO);
+
+    await submitTrade(page, {
+      mode: "buy",
+      symbol: "DETAIL",
+      companyName: "Detail Co",
+      quantity: 10,
+      price: 10,
+      date: "2026-01-10",
+    });
+    await expect(page.locator('[data-testid="trade-result"]')).toBeVisible();
+    await submitTrade(page, {
+      mode: "sell",
+      symbol: "DETAIL",
+      quantity: 4,
+      price: 20,
+      date: "2026-02-10",
+    });
+    await expect(page.locator('[data-testid="trade-result"]')).toBeVisible();
+
+    await page
+      .locator('[data-testid="holdings-section"] tr', { hasText: "DETAIL" })
+      .first()
+      .locator('[data-testid="holding-link"]')
+      .click();
+
+    await expect(page).toHaveURL(/\/holdings\/DETAIL$/);
+    await expect(page.locator("h1")).toHaveText("DETAIL");
+
+    // $80 of proceeds against the $40 those 4 shares cost.
+    await expect(page.locator('[data-testid="total-realised"]')).toHaveText(
+      "$40.00",
+    );
+
+    // Only this symbol's history, and only the sale carries a gain.
+    const rows = page.locator('[data-testid="holding-transaction-row"]');
+    await expect(rows).toHaveCount(2);
+    await expect(
+      rows.filter({ hasText: "sell" }).locator('[data-testid="row-realised"]'),
+    ).toHaveText("$40.00");
+    await expect(
+      rows.filter({ hasText: "buy" }).locator('[data-testid="row-realised"]'),
+    ).toHaveText("—");
+
+    await page.click('[data-testid="back-to-account"]');
+    await expect(
+      page.locator('[data-testid="holdings-section"]'),
+    ).toBeVisible();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Dividends
 // ---------------------------------------------------------------------------
 

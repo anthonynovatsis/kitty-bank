@@ -210,8 +210,14 @@ function InvestmentAccountDetail({ account }: { account: InvestmentAccount }) {
               <tbody className="divide-border divide-y">
                 {account.holdings.map((holding) => (
                   <tr key={holding.id}>
-                    <td className="text-foreground py-3 pr-4 font-semibold">
-                      {holding.symbol}
+                    <td className="py-3 pr-4 font-semibold">
+                      <Link
+                        data-testid="holding-link"
+                        href={`/dashboard/accounts/${account.id}/holdings/${holding.symbol}`}
+                        className="text-primary hover:underline"
+                      >
+                        {holding.symbol}
+                      </Link>
                     </td>
                     <td className="py-3 pr-4">{holding.companyName ?? "—"}</td>
                     <td className="py-3 pr-4 text-right">

@@ -839,6 +839,136 @@ describe("user.investments.adjustHolding", () => {
 });
 
 // ---------------------------------------------------------------------------
+// One position, in detail
+// ---------------------------------------------------------------------------
+
+describe("user.investments.getHoldingDetail", () => {
+  const { db, migrate } = createTestDb();
+  let admin: FakeUser;
+  let owner: FakeUser;
+  let accountId: string;
+
+  beforeAll(async () => {
+    await migrate();
+    admin = await insertAdminUser(db);
+    owner = await insertUser(db, { requiresTransactionApproval: false });
+    accountId = await makeInvestmentAccount(db, admin, owner.id, {
+      name: "Portfolio",
+    });
+
+    const caller = createTestCaller(db, makeSession(owner));
+    await caller.user.investments.buy({
+      accountId,
+      symbol: "DETAIL",
+      companyName: "Detail Co",
+      quantity: 10,
+      price: 10,
+      transactionDate: new Date("2026-01-01"),
+    });
+    await caller.user.investments.sell({
+      accountId,
+      symbol: "DETAIL",
+      quantity: 4,
+      price: 20,
+      transactionDate: new Date("2026-02-01"),
+    });
+    // A second symbol, to prove the detail is narrowed to one.
+    await caller.user.investments.buy({
+      accountId,
+      symbol: "OTHER",
+      quantity: 1,
+      price: 5,
+    });
+  });
+
+  function caller() {
+    return createTestCaller(db, makeSession(owner));
+  }
+
+  it("returns the position with only its own history", async () => {
+    const result = await caller().user.investments.getHoldingDetail({
+      accountId,
+      symbol: "detail",
+    });
+
+    expect(result.symbol).toBe("DETAIL");
+    expect(result.holding?.quantity).toBe(6);
+    expect(result.transactions).toHaveLength(2);
+    expect(result.transactions.every((row) => row.symbol === "DETAIL")).toBe(
+      true,
+    );
+  });
+
+  /*
+   * Replayed rather than remembered, so the figure is always what the current
+   * journal implies — which is what lets deleting an earlier buy move it.
+   */
+  it("reports realised gain per sale and in total", async () => {
+    const result = await caller().user.investments.getHoldingDetail({
+      accountId,
+      symbol: "DETAIL",
+    });
+
+    const sale = result.transactions.find(
+      (row) => row.transactionType === "sell",
+    );
+    const buy = result.transactions.find(
+      (row) => row.transactionType === "buy",
+    );
+
+    // $80 of proceeds against the $40 those 4 shares cost.
+    expect(sale?.realisedGain).toBe(40_00);
+    expect(buy?.realisedGain).toBeNull();
+    expect(result.totalRealised).toBe(40_00);
+  });
+
+  it("keeps the history of a position that has been closed out", async () => {
+    await caller().user.investments.sell({
+      accountId,
+      symbol: "DETAIL",
+      quantity: 6,
+      price: 25,
+      transactionDate: new Date("2026-03-01"),
+    });
+
+    const result = await caller().user.investments.getHoldingDetail({
+      accountId,
+      symbol: "DETAIL",
+    });
+
+    // The holding row is gone; what happened is not.
+    expect(result.holding).toBeNull();
+    expect(result.transactions).toHaveLength(3);
+    // $40 on the first sale, $90 on the second.
+    expect(result.totalRealised).toBe(130_00);
+  });
+
+  it("is NOT_FOUND for a symbol with no history", async () => {
+    await expectTRPCError(
+      caller().user.investments.getHoldingDetail({
+        accountId,
+        symbol: "NEVER",
+      }),
+      "NOT_FOUND",
+    );
+  });
+
+  it("does not expose another user's position", async () => {
+    const stranger = await insertUser(db, {
+      requiresTransactionApproval: false,
+    });
+
+    await expectTRPCError(
+      createTestCaller(
+        db,
+        makeSession(stranger),
+      ).user.investments.getHoldingDetail({ accountId, symbol: "DETAIL" }),
+      "FORBIDDEN",
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Dividends
 // ---------------------------------------------------------------------------
 

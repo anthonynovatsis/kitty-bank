@@ -17,6 +17,7 @@ import {
   type TradeType,
   assertActiveAccount,
   assertSufficientShares,
+  foldHistory,
   loadHolding,
   investmentError,
   isOutOfOrder,
@@ -798,6 +799,80 @@ export const userRouter = createTRPCRouter({
           where: eq(holdings.investmentAccountId, input.accountId),
           orderBy: [asc(holdings.symbol)],
         });
+      }),
+
+    /**
+     * One position, with the history that produced it.
+     *
+     * The realised gains come from replaying that history rather than from
+     * anything stored, so they are always what the current journal implies —
+     * delete an earlier buy and these move, which is the point.
+     */
+    getHoldingDetail: protectedProcedure
+      .input(
+        z.object({
+          accountId: z.string(),
+          symbol: z.string().trim().min(1).max(20),
+        }),
+      )
+      .query(async ({ ctx, input }) => {
+        await assertOwnInvestmentAccount(
+          ctx.db,
+          input.accountId,
+          ctx.session.user.id,
+        );
+
+        const symbol = normaliseSymbol(input.symbol);
+
+        const [holding, transactions] = await Promise.all([
+          ctx.db.query.holdings.findFirst({
+            where: and(
+              eq(holdings.investmentAccountId, input.accountId),
+              eq(holdings.symbol, symbol),
+            ),
+          }),
+          ctx.db.query.investmentTransactions.findMany({
+            where: and(
+              eq(investmentTransactions.investmentAccountId, input.accountId),
+              eq(investmentTransactions.symbol, symbol),
+            ),
+            orderBy: [
+              desc(investmentTransactions.transactionDate),
+              desc(investmentTransactions.createdAt),
+            ],
+          }),
+        ]);
+
+        if (!holding && transactions.length === 0) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: `No position in ${symbol}`,
+          });
+        }
+
+        /*
+         * Folded oldest-first, which is the opposite of how the list above is
+         * displayed — the replay needs chronological order, a reader wants the
+         * most recent thing at the top.
+         */
+        const executed = [...transactions]
+          .filter((row) => row.status === "executed")
+          .reverse();
+        const position = foldHistory(executed);
+
+        return {
+          symbol,
+          holding: holding ?? null,
+          transactions: transactions.map((row) => ({
+            ...row,
+            realisedGain: position.realisedGains.get(row.id) ?? null,
+          })),
+          /** Every disposal so far, as the current history has it. */
+          totalRealised: sumCents(
+            [...position.realisedGains.values()],
+            (g) => g,
+          ),
+        };
       }),
 
     // Trade history for one of the user's own investment accounts

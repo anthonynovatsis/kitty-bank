@@ -560,7 +560,7 @@ changing definition under an unchanged label.
 - [x] Deleting a trade, and rebuilding the position from history
 - [x] Rebuild on out-of-order entry (see below); `last_transaction_date` advances only
 - [x] Dividend processing and DRIP functionality (recorded from statements — see below)
-- [ ] `user.investments.getHoldingDetail` — one position with its own history
+- [x] `user.investments.getHoldingDetail` — one position with its own history
 - [ ] Cost basis calculations and tax lot tracking
 - [ ] Portfolio analytics and performance reporting
 - [ ] Market data integration for real-time values
