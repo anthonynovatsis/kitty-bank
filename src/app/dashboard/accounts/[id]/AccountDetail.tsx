@@ -5,6 +5,7 @@ import { api } from "~/trpc/react";
 import { StatusBadge, statusTone } from "~/components/StatusBadge";
 import { CashTransactionForms } from "./CashTransactionForms";
 import { CashTransactionHistory } from "./CashTransactionHistory";
+import { DividendForm } from "./DividendForm";
 import { HoldingAdjustment } from "./HoldingAdjustment";
 import { TradeForms } from "./TradeForms";
 import { TradeHistory } from "./TradeHistory";
@@ -134,6 +135,7 @@ type Holding = {
   companyName: string | null;
   quantity: number;
   totalCostBasis: Cents;
+  dividendCashBalance: Cents;
   dividendReinvestment: boolean;
 };
 
@@ -230,6 +232,7 @@ function InvestmentAccountDetail({ account }: { account: InvestmentAccount }) {
       {account.status === "active" && (
         <>
           <TradeForms accountId={account.id} holdings={account.holdings} />
+          <DividendForm accountId={account.id} holdings={account.holdings} />
           <HoldingAdjustment
             accountId={account.id}
             holdings={account.holdings}

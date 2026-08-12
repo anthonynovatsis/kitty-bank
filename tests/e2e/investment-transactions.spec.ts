@@ -171,6 +171,83 @@ test.describe("trades — auto-approved user", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Dividends
+// ---------------------------------------------------------------------------
+
+test.describe("dividends", () => {
+  test.use({ storageState: ADMIN_AUTH_FILE });
+
+  /*
+   * The plan's worked example, entered the way the statement reads: $23.45
+   * brought forward, $42.00 paid, 2 shares at $31.20, $3.05 carried. Nothing
+   * on this form is calculated — the registry already did that.
+   */
+  test("a reinvested dividend adds its shares and records the residual", async ({
+    page,
+  }) => {
+    await openAccount(page, PORTFOLIO);
+    await submitTrade(page, {
+      mode: "buy",
+      symbol: "PAYER",
+      quantity: 100,
+      price: 30,
+      date: "2026-01-05",
+    });
+    await expect(page.locator('[data-testid="trade-result"]')).toBeVisible();
+
+    await chooseOptionByLabel(page, "dividend-symbol", "PAYER");
+    await page.fill('[data-testid="dividend-amount"]', "42");
+    await page.fill('[data-testid="dividend-quantity"]', "2");
+    await page.fill('[data-testid="dividend-price"]', "31.20");
+    await page.fill('[data-testid="brought-forward"]', "23.45");
+    await page.fill('[data-testid="carried-forward"]', "3.05");
+    await page.fill('[data-testid="dividend-date"]', "2026-02-05");
+    await page.click('[data-testid="submit-dividend"]');
+
+    await expect(page.locator('[data-testid="dividend-result"]')).toHaveText(
+      "Dividend recorded.",
+    );
+
+    const row = page
+      .locator('[data-testid="holdings-section"] tr', { hasText: "PAYER" })
+      .first();
+    await expect(row).toContainText("102");
+
+    await expect(
+      page.locator('[data-testid="trade-row"]', { hasText: "PAYER" }).first(),
+    ).toContainText("dividend reinvest");
+
+    // What the plan is holding comes back on the next visit to the form.
+    await openAccount(page, PORTFOLIO);
+    await chooseOptionByLabel(page, "dividend-symbol", "PAYER");
+    await expect(page.locator('[data-testid="last-residual"]')).toContainText(
+      "$3.05",
+    );
+  });
+
+  test("a cash dividend leaves the position alone", async ({ page }) => {
+    await openAccount(page, PORTFOLIO);
+
+    const row = page
+      .locator('[data-testid="holdings-section"] tr', { hasText: "PAYER" })
+      .first();
+    await expect(row).toContainText("102");
+
+    await page.click('[data-testid="dividend-mode-cash"]');
+    await chooseOptionByLabel(page, "dividend-symbol", "PAYER");
+    await page.fill('[data-testid="dividend-amount"]', "15");
+    await page.fill('[data-testid="dividend-date"]', "2026-05-05");
+    await page.click('[data-testid="submit-dividend"]');
+
+    await expect(page.locator('[data-testid="dividend-result"]')).toHaveText(
+      "Dividend recorded.",
+    );
+    // Income, not shares.
+    await expect(row).toContainText("102");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Deleting a trade
 // ---------------------------------------------------------------------------
 
