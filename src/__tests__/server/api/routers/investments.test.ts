@@ -924,6 +924,50 @@ describe("user.investments.recordDividend", () => {
     );
   });
 
+  /*
+   * A setting, not a record. It says how the *next* dividend is expected to
+   * arrive; recording one still asks how that one was actually paid.
+   */
+  it("toggles reinvestment without touching the position", async () => {
+    const before = await holdingIn(db, accountId, "DRIP");
+    expect(before?.dividendReinvestment).toBe(false);
+
+    await caller().user.investments.updateDRIP({
+      accountId,
+      symbol: "drip",
+      enabled: true,
+    });
+
+    const after = await holdingIn(db, accountId, "DRIP");
+    expect(after?.dividendReinvestment).toBe(true);
+    expect(after?.quantity).toBe(before?.quantity);
+    expect(after?.totalCostBasis).toBe(before?.totalCostBasis);
+
+    await caller().user.investments.updateDRIP({
+      accountId,
+      symbol: "DRIP",
+      enabled: false,
+    });
+    expect((await holdingIn(db, accountId, "DRIP"))?.dividendReinvestment).toBe(
+      false,
+    );
+  });
+
+  it("does not let a stranger toggle reinvestment", async () => {
+    const stranger = await insertUser(db, {
+      requiresTransactionApproval: false,
+    });
+
+    await expectTRPCError(
+      createTestCaller(db, makeSession(stranger)).user.investments.updateDRIP({
+        accountId,
+        symbol: "DRIP",
+        enabled: true,
+      }),
+      "FORBIDDEN",
+    );
+  });
+
   it("refuses a dividend on a symbol that is not held", async () => {
     await expectInvestmentError(
       caller().user.investments.recordDividend({

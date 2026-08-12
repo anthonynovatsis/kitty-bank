@@ -225,6 +225,28 @@ test.describe("dividends", () => {
     );
   });
 
+  test("reinvestment can be switched on for a position", async ({ page }) => {
+    await openAccount(page, PORTFOLIO);
+
+    const row = page
+      .locator('[data-testid="holdings-section"] tr', { hasText: "PAYER" })
+      .first();
+    const toggle = row.locator('[data-testid="drip-toggle"]');
+
+    await expect(toggle).toHaveText("Off");
+    await toggle.click();
+    await expect(toggle).toHaveText("On");
+
+    // It is a setting, so it survives a reload.
+    await openAccount(page, PORTFOLIO);
+    await expect(
+      page
+        .locator('[data-testid="holdings-section"] tr', { hasText: "PAYER" })
+        .first()
+        .locator('[data-testid="drip-toggle"]'),
+    ).toHaveText("On");
+  });
+
   test("a cash dividend leaves the position alone", async ({ page }) => {
     await openAccount(page, PORTFOLIO);
 

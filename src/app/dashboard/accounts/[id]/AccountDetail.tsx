@@ -6,6 +6,7 @@ import { StatusBadge, statusTone } from "~/components/StatusBadge";
 import { CashTransactionForms } from "./CashTransactionForms";
 import { CashTransactionHistory } from "./CashTransactionHistory";
 import { DividendForm } from "./DividendForm";
+import { DripToggle } from "./DripToggle";
 import { HoldingAdjustment } from "./HoldingAdjustment";
 import { TradeForms } from "./TradeForms";
 import { TradeHistory } from "./TradeHistory";
@@ -200,7 +201,10 @@ function InvestmentAccountDetail({ account }: { account: InvestmentAccount }) {
                   <th className="pr-4 pb-3 font-medium">Company</th>
                   <th className="pr-4 pb-3 text-right font-medium">Quantity</th>
                   <th className="pr-4 pb-3 text-right font-medium">Avg Cost</th>
-                  <th className="pb-3 text-right font-medium">Total Cost</th>
+                  <th className="pr-4 pb-3 text-right font-medium">
+                    Total Cost
+                  </th>
+                  <th className="pb-3 font-medium">DRIP</th>
                 </tr>
               </thead>
               <tbody className="divide-border divide-y">
@@ -218,8 +222,15 @@ function InvestmentAccountDetail({ account }: { account: InvestmentAccount }) {
                         averageCents(holding.totalCostBasis, holding.quantity),
                       )}
                     </td>
-                    <td className="py-3 text-right font-medium">
+                    <td className="py-3 pr-4 text-right font-medium">
                       {formatCents(holding.totalCostBasis)}
+                    </td>
+                    <td className="py-3">
+                      <DripToggle
+                        accountId={account.id}
+                        symbol={holding.symbol}
+                        enabled={holding.dividendReinvestment}
+                      />
                     </td>
                   </tr>
                 ))}

@@ -598,6 +598,38 @@ export const userRouter = createTRPCRouter({
       ),
 
     /**
+     * Turn dividend reinvestment on or off for a position.
+     *
+     * A setting rather than a transaction: it records how the *next* dividend
+     * is expected to arrive, and changes nothing that has already happened. So
+     * it writes the holding directly, needs no approval, and is one of the two
+     * things on that row a replay cannot reconstruct.
+     */
+    updateDRIP: protectedProcedure
+      .input(
+        z.object({
+          accountId: z.string(),
+          symbol: symbolSchema,
+          enabled: z.boolean(),
+        }),
+      )
+      .mutation(({ ctx, input }) =>
+        ctx.db.transaction(async (tx) => {
+          const userId = ctx.session.user.id;
+          await loadOwnInvestmentAccount(tx, input.accountId, userId);
+
+          const holding = await loadHolding(tx, input.accountId, input.symbol);
+
+          await tx
+            .update(holdings)
+            .set({ dividendReinvestment: input.enabled })
+            .where(eq(holdings.id, holding.id));
+
+          return { symbol: holding.symbol, enabled: input.enabled };
+        }),
+      ),
+
+    /**
      * Record a dividend, reinvested or taken as cash.
      *
      * Recorded, not computed. The registry has already worked out how many
