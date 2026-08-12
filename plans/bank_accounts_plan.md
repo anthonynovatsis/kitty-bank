@@ -557,12 +557,19 @@ free means it will mean something when prices arrive, rather than quietly
 changing definition under an unchanged label.
 
 ### Phase 4: Advanced Investment Features
-- [ ] Deleting a trade, and rebuilding the position from history
-- [ ] Rebuild on out-of-order entry (see below); `last_transaction_date` advances only
-- [ ] Dividend processing and DRIP functionality (recorded from statements — see below)
-- [ ] Cost basis calculations and tax lot tracking  
+- [x] Deleting a trade, and rebuilding the position from history
+- [x] Rebuild on out-of-order entry (see below); `last_transaction_date` advances only
+- [x] Dividend processing and DRIP functionality (recorded from statements — see below)
+- [ ] `user.investments.getHoldingDetail` — one position with its own history
+- [ ] Cost basis calculations and tax lot tracking
 - [ ] Portfolio analytics and performance reporting
 - [ ] Market data integration for real-time values
+
+The three that are done share a spine: `foldHistory` replaying the journal in
+date order. Deleting removes a row and replays; an out-of-order entry replays
+rather than incrementing; a dividend always replays, because the residual is the
+latest statement's figure rather than a running total. The three that remain do
+not depend on each other, and only tax lots would touch the fold.
 
 **Deleting a trade rebuilds the position.** Phase 3 ships with no way to undo a
 settled trade, which is a real hole: a wrong deposit can be answered with a
