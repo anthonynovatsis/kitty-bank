@@ -238,6 +238,13 @@ export type FoldedPosition = {
   companyName: string | null;
   lastTransactionDate: Date | null;
   /**
+   * What the DRIP plan is holding, per the most recent dividend statement.
+   *
+   * Recorded on each dividend rather than accumulated here, so this is the
+   * registry's figure rather than one of ours that could disagree with it.
+   */
+  dividendCashBalance: Cents;
+  /**
    * What each sale realised, by transaction id.
    *
    * Computed here rather than stored, so it is always the figure the current
@@ -257,6 +264,7 @@ type JournalEntry = {
   companyName: string | null;
   splitNumerator: number | null;
   splitDenominator: number | null;
+  residualCarriedForward: Cents | null;
   transactionDate: Date;
 };
 
@@ -277,17 +285,31 @@ export function foldHistory(entries: readonly JournalEntry[]): FoldedPosition {
   let cost = 0;
   let companyName: string | null = null;
   let lastTransactionDate: Date | null = null;
+  let dividendCashBalance = 0;
   const realisedGains = new Map<string, Cents>();
 
   for (const entry of entries) {
     switch (entry.transactionType) {
       // A reinvested dividend is a purchase; the only difference is where the
       // money came from, which the holding does not record.
-      case "buy":
-      case "dividend_reinvest": {
+      case "dividend_reinvest":
+        dividendCashBalance = entry.residualCarriedForward ?? 0;
+      // falls through
+      case "buy": {
         quantity += entry.quantity ?? 0;
         cost += entry.amount;
         companyName ??= entry.companyName;
+        break;
+      }
+
+      /*
+       * A dividend taken as cash changes no position — it is income, recorded
+       * against the symbol that paid it. It can still move the plan's residual,
+       * so that is read before moving on.
+       */
+      case "dividend": {
+        dividendCashBalance =
+          entry.residualCarriedForward ?? dividendCashBalance;
         break;
       }
 
@@ -351,6 +373,7 @@ export function foldHistory(entries: readonly JournalEntry[]): FoldedPosition {
     totalCostBasis: cents(cost),
     companyName,
     lastTransactionDate,
+    dividendCashBalance: cents(dividendCashBalance),
     realisedGains,
   };
 }
@@ -416,6 +439,7 @@ export async function rebuildHolding(
       companyName: position.companyName,
       quantity: position.quantity,
       totalCostBasis: position.totalCostBasis,
+      dividendCashBalance: position.dividendCashBalance,
       lastTransactionDate: position.lastTransactionDate,
     })
     .onConflictDoUpdate({
@@ -423,6 +447,7 @@ export async function rebuildHolding(
       set: {
         quantity: position.quantity,
         totalCostBasis: position.totalCostBasis,
+        dividendCashBalance: position.dividendCashBalance,
         lastTransactionDate: position.lastTransactionDate,
         // Deliberately not overwritten with null: the name is not derivable
         // from a history whose naming buy may itself have been deleted.

@@ -287,7 +287,7 @@ export const investmentTransactions = sqliteTable(
     transactionType: d
       .text({ length: 50 })
       .notNull()
-      .$type<"buy" | "sell" | "dividend_reinvest" | "split">(),
+      .$type<"buy" | "sell" | "dividend" | "dividend_reinvest" | "split">(),
     symbol: d.text({ length: 20 }).notNull(),
     /*
      * Carried on the transaction as well as the holding, because a buy can sit
@@ -308,6 +308,18 @@ export const investmentTransactions = sqliteTable(
     /** A 2-for-1 split; a 1-for-5 consolidation. Null on anything but a split. */
     splitNumerator: d.integer(),
     splitDenominator: d.integer(),
+    /*
+     * What a DRIP statement says the plan was holding either side of this
+     * dividend. Recorded rather than computed: the registry has already done
+     * the arithmetic, and deriving it here would produce a second number free
+     * to disagree with the paper.
+     *
+     * Keeping both ends is what makes the next statement checkable — if its
+     * opening balance does not match the last closing one, a dividend was
+     * missed. Null on anything but a dividend.
+     */
+    residualBroughtForward: d.integer().$type<Cents>(),
+    residualCarriedForward: d.integer().$type<Cents>(),
     price: d.integer().$type<Cents>(),
     amount: d.integer().$type<Cents>().notNull(),
     brokerage: d.integer().$type<Cents>().notNull().default(cents(0)),

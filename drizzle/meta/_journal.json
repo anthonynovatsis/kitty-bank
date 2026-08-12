@@ -70,6 +70,13 @@
       "when": 1786443448760,
       "tag": "0009_split_ratio_on_transactions",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1786532301866,
+      "tag": "0010_dividend_residuals",
+      "breakpoints": true
     }
   ]
 }

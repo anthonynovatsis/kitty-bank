@@ -18,6 +18,7 @@ import {
   assertActiveAccount,
   assertSufficientShares,
   loadHolding,
+  investmentError,
   isOutOfOrder,
   loadInvestmentAccount,
   normaliseSymbol,
@@ -592,6 +593,98 @@ export const userRouter = createTRPCRouter({
             status: transaction!.status,
             requiresApproval: needsApproval,
             outcome,
+          };
+        }),
+      ),
+
+    /**
+     * Record a dividend, reinvested or taken as cash.
+     *
+     * Recorded, not computed. The registry has already worked out how many
+     * shares the dividend bought and what it is holding back; deriving that
+     * here would produce a second number free to disagree with the statement.
+     * So the inputs are the figures a statement prints, and the residual is
+     * carried on the transaction where a replay can find it.
+     */
+    recordDividend: protectedProcedure
+      .input(
+        z.object({
+          accountId: z.string(),
+          symbol: symbolSchema,
+          /** The dividend paid, before any of it was reinvested. */
+          amount: amountSchema,
+          /** Shares allotted and their price — omit for a cash dividend. */
+          quantity: quantitySchema.optional(),
+          price: priceSchema.optional(),
+          /** What the plan held before and after, per the statement. */
+          residualBroughtForward: z.number().min(0).finite().default(0),
+          residualCarriedForward: z.number().min(0).finite().default(0),
+          description: descriptionSchema,
+          transactionDate: transactionDateSchema,
+        }),
+      )
+      .mutation(({ ctx, input }) =>
+        ctx.db.transaction(async (tx) => {
+          const userId = ctx.session.user.id;
+          assertActiveAccount(
+            await loadOwnInvestmentAccount(tx, input.accountId, userId),
+          );
+
+          // Income is paid on a position, so there has to be one.
+          const holding = await loadHolding(tx, input.accountId, input.symbol);
+
+          const reinvested = input.quantity !== undefined;
+          if (reinvested && input.price === undefined) {
+            throw investmentError(
+              "invalid_quantity",
+              "A reinvested dividend needs the price the shares were allotted at",
+            );
+          }
+
+          const transactionDate = input.transactionDate ?? new Date();
+          const needsApproval = await requiresApproval(tx, userId);
+
+          /*
+           * `amount` is what the shares cost, so it goes into the basis — the
+           * dividend was spent on them. For a cash dividend nothing is bought,
+           * and the amount is the income rather than a cost.
+           */
+          const amount = reinvested
+            ? cents(input.quantity! * toCents(input.price!))
+            : toCents(input.amount);
+
+          const [transaction] = await tx
+            .insert(investmentTransactions)
+            .values({
+              investmentAccountId: input.accountId,
+              transactionType: reinvested ? "dividend_reinvest" : "dividend",
+              symbol: holding.symbol,
+              quantity: input.quantity ?? null,
+              price: input.price ? toCents(input.price) : null,
+              amount,
+              residualBroughtForward: toCents(input.residualBroughtForward),
+              residualCarriedForward: toCents(input.residualCarriedForward),
+              description: input.description ?? null,
+              transactionDate,
+              status: needsApproval ? "pending" : "executed",
+              createdByUserId: userId,
+            })
+            .returning();
+
+          /*
+           * Always a replay rather than an increment. A dividend moves the
+           * recorded residual as well as the shares, and the residual is "the
+           * latest statement's figure" rather than a running total — which only
+           * the fold knows how to decide.
+           */
+          if (!needsApproval) {
+            await rebuildHolding(tx, input.accountId, holding.symbol);
+          }
+
+          return {
+            transaction: transaction!,
+            status: transaction!.status,
+            requiresApproval: needsApproval,
           };
         }),
       ),

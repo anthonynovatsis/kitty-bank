@@ -839,6 +839,117 @@ describe("user.investments.adjustHolding", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Dividends
+// ---------------------------------------------------------------------------
+
+describe("user.investments.recordDividend", () => {
+  const { db, migrate } = createTestDb();
+  let admin: FakeUser;
+  let owner: FakeUser;
+  let accountId: string;
+
+  beforeAll(async () => {
+    await migrate();
+    admin = await insertAdminUser(db);
+    owner = await insertUser(db, { requiresTransactionApproval: false });
+    accountId = await makeInvestmentAccount(db, admin, owner.id, {
+      name: "Portfolio",
+    });
+  });
+
+  function caller() {
+    return createTestCaller(db, makeSession(owner));
+  }
+
+  /*
+   * The worked example from the plan, entered as a statement presents it:
+   * $23.45 brought forward, $42.00 paid, 2 shares allotted at $31.20, $3.05
+   * carried. Nothing here is derived — the registry did that arithmetic.
+   */
+  it("records a reinvested dividend as the statement prints it", async () => {
+    await caller().user.investments.buy({
+      accountId,
+      symbol: "DRIP",
+      quantity: 100,
+      price: 30,
+      transactionDate: new Date("2026-01-01"),
+    });
+
+    const result = await caller().user.investments.recordDividend({
+      accountId,
+      symbol: "drip",
+      amount: 42,
+      quantity: 2,
+      price: 31.2,
+      residualBroughtForward: 23.45,
+      residualCarriedForward: 3.05,
+      transactionDate: new Date("2026-02-01"),
+    });
+
+    expect(result.status).toBe("executed");
+    expect(result.transaction.transactionType).toBe("dividend_reinvest");
+    expect(result.transaction.residualCarriedForward).toBe(3_05);
+
+    const holding = await holdingIn(db, accountId, "DRIP");
+    expect(holding?.quantity).toBe(102);
+    // The shares cost what they were allotted at, so that joins the pool.
+    expect(holding?.totalCostBasis).toBe(3062_40);
+    expect(holding?.dividendCashBalance).toBe(3_05);
+  });
+
+  it("records a cash dividend without moving the position", async () => {
+    const before = await holdingIn(db, accountId, "DRIP");
+
+    await caller().user.investments.recordDividend({
+      accountId,
+      symbol: "DRIP",
+      amount: 15,
+      transactionDate: new Date("2026-05-01"),
+    });
+
+    const after = await holdingIn(db, accountId, "DRIP");
+    expect(after?.quantity).toBe(before?.quantity);
+    expect(after?.totalCostBasis).toBe(before?.totalCostBasis);
+  });
+
+  it("needs the allotment price when shares were issued", async () => {
+    await expectInvestmentError(
+      caller().user.investments.recordDividend({
+        accountId,
+        symbol: "DRIP",
+        amount: 42,
+        quantity: 2,
+      }),
+      "invalid_quantity",
+    );
+  });
+
+  it("refuses a dividend on a symbol that is not held", async () => {
+    await expectInvestmentError(
+      caller().user.investments.recordDividend({
+        accountId,
+        symbol: "NOTHELD",
+        amount: 10,
+      }),
+      "holding_not_found",
+    );
+  });
+
+  /*
+   * The reason for recording the residual at all: a missed dividend shows up as
+   * a break between one statement's closing balance and the next one's opening.
+   */
+  it("keeps both ends of the residual so a gap is visible", async () => {
+    const rows = await db.query.investmentTransactions.findMany({
+      where: (t, { eq: is }) => is(t.transactionType, "dividend_reinvest"),
+    });
+
+    expect(rows[0]!.residualBroughtForward).toBe(23_45);
+    expect(rows[0]!.residualCarriedForward).toBe(3_05);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Deleting a transaction
 // ---------------------------------------------------------------------------
 

@@ -26,6 +26,7 @@ function entry(
     companyName?: string | null;
     splitNumerator?: number | null;
     splitDenominator?: number | null;
+    residualCarriedForward?: number | null;
     date?: string;
   } = {},
 ) {
@@ -37,6 +38,11 @@ function entry(
     companyName: overrides.companyName ?? null,
     splitNumerator: overrides.splitNumerator ?? null,
     splitDenominator: overrides.splitDenominator ?? null,
+    residualCarriedForward:
+      overrides.residualCarriedForward === undefined ||
+      overrides.residualCarriedForward === null
+        ? null
+        : cents(overrides.residualCarriedForward),
     transactionDate: new Date(overrides.date ?? "2026-01-01"),
   };
 }
@@ -52,6 +58,7 @@ describe("foldHistory", () => {
       totalCostBasis: 0,
       companyName: null,
       lastTransactionDate: null,
+      dividendCashBalance: 0,
       realisedGains: new Map(),
     });
   });
@@ -140,11 +147,51 @@ describe("foldHistory", () => {
   it("treats a reinvested dividend as the purchase it is", () => {
     const position = foldHistory([
       entry("buy", { quantity: 10, amount: 1000_00 }),
-      entry("dividend_reinvest", { quantity: 2, amount: 62_40 }),
+      entry("dividend_reinvest", {
+        quantity: 2,
+        amount: 62_40,
+        residualCarriedForward: 3_05,
+      }),
     ]);
 
     expect(position.quantity).toBe(12);
     expect(position.totalCostBasis).toBe(1062_40);
+    // The registry's figure, taken as recorded rather than worked out here.
+    expect(position.dividendCashBalance).toBe(3_05);
+  });
+
+  /*
+   * A dividend taken as cash is income against the symbol that paid it. It
+   * moves no shares and no cost — only, possibly, what the plan is holding.
+   */
+  it("leaves the position alone for a dividend taken as cash", () => {
+    const position = foldHistory([
+      entry("buy", { quantity: 10, amount: 1000_00 }),
+      entry("dividend", { amount: 42_00 }),
+    ]);
+
+    expect(position.quantity).toBe(10);
+    expect(position.totalCostBasis).toBe(1000_00);
+  });
+
+  it("carries the residual from the latest dividend, not the sum of them", () => {
+    const position = foldHistory([
+      entry("buy", { quantity: 100, amount: 1000_00, date: "2026-01-01" }),
+      entry("dividend_reinvest", {
+        quantity: 1,
+        amount: 31_20,
+        residualCarriedForward: 23_45,
+        date: "2026-02-01",
+      }),
+      entry("dividend_reinvest", {
+        quantity: 2,
+        amount: 62_40,
+        residualCarriedForward: 3_05,
+        date: "2026-05-01",
+      }),
+    ]);
+
+    expect(position.dividendCashBalance).toBe(3_05);
   });
 
   /*
